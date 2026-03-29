@@ -7,7 +7,6 @@
         "@expo/vector-icons": "^15.0.3",
         "@nkzw/create-context-hook": "^1.1.0",
         "@react-native-async-storage/async-storage": "2.2.0",
-        "@rork-ai/toolkit-sdk": "^0.2.46",
         "@stardazed/streams-text-encoding": "^1.0.2",
         "@tanstack/react-query": "^5.83.0",
         "@ungap/structured-clone": "^1.3.0",
@@ -2884,37 +2883,6 @@
       "",
       { "dependencies": { "nanoid": "^3.3.11" } },
       "sha512-pxipMW/iEBSUrjxz2cDD7fNwkqR4xoi0E/PcfTQGCcdJwLoaxzab5kSadBLj1MTJyT0YRrOXL9umHpXtp+Dv4w==",
-    ],
-
-    "@rork-ai/toolkit-sdk": [
-      "@rork-ai/toolkit-sdk@0.2.46",
-      "",
-      {
-        "dependencies": {
-          "@ai-sdk/react": "^2.0.89",
-          "@blazejkustra/react-native-alert": "^1.0.0",
-          "@stardazed/streams-text-encoding": "^1.0.2",
-          "@teovilla/react-native-web-maps": "^0.9.5",
-          "@ungap/structured-clone": "^1.3.0",
-          "ai": "5.0.93",
-          "assert": "^2.1.0",
-          "posthog-react-native": "4.13.0",
-        },
-        "peerDependencies": {
-          "@tanstack/react-query": "*",
-          "expo": "*",
-          "expo-blur": "*",
-          "expo-router": "*",
-          "expo-web-browser": "*",
-          "lucide-react-native": "*",
-          "react": "*",
-          "react-native": "*",
-          "react-native-safe-area-context": "*",
-          "react-native-web": "*",
-          "zod": "^4",
-        },
-      },
-      "sha512-1pH2EUC09/rN5lLfoVnNKhEMJTXnh1BKcb2UftXjiQexPVzI75FLU7i+LKkUxXpO9ipyDN3uRiLc3Y/NGHZTmg==",
     ],
 
     "@rtsao/scc": [

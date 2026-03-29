@@ -6,6 +6,8 @@ import Colors from '@/constants/colors';
 import { useMatches, useData, useApp } from '@/context/AppContext';
 import { mockPlayers } from '@/mocks/data';
 import { BatsmanScore } from '@/types';
+import { getMatches } from '../api/matchesApi';
+import { matchTypes } from '../create-match';
 
 type TabType = 'scorecard' | 'info' | 'commentary';
 
@@ -52,7 +54,7 @@ export default function MatchDetailScreen() {
 
   const handleStartScoring = () => {
     setCurrentMatch({ ...match, status: 'live', startedAt: new Date().toISOString() });
-    router.push('/live-scoring');
+    router.push('/match/live-scoring');
   };
 
   const formatDate = (dateStr: string) => {
@@ -466,7 +468,7 @@ export default function MatchDetailScreen() {
               <View style={styles.infoRow}>
                 <Trophy size={18} color={Colors.textMuted} />
                 <Text style={styles.infoLabel}>Format</Text>
-                <Text style={styles.infoValue}>{match.matchType} - {match.totalOvers} overs</Text>
+                <Text style={styles.infoValue}>{matchTypes.find((t) => t.key === match.matchType)?.label} - {match.totalOvers} overs</Text>
               </View>
             </View>
 

@@ -44,7 +44,7 @@ export default function MoreScreen() {
       items: [
         { icon: Trophy, label: 'Tournaments', subtitle: 'View all tournaments', color: Colors.primary, onPress: () => { } },
         { icon: BarChart3, label: 'Leaderboards', subtitle: 'Top performers', color: Colors.secondary, onPress: () => { } },
-        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', color: Colors.accent, badge: unreadCount, onPress: () => router.push('../notifications') },
+        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', color: Colors.accent, badge: unreadCount, onPress: () => router.push('../notification') },
       ],
     },
     {

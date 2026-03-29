@@ -76,17 +76,6 @@ export default function LiveMatchCard({ match }: Props) {
               </Text>
             </View>
           )}
-
-          {secondInnings && secondInnings.battingTeam === match.teamA && (
-            <View style={styles.scoreContainer}>
-              <Text style={styles.score}>
-                {secondInnings.runs}/{secondInnings.wickets}
-              </Text>
-              <Text style={styles.overs}>
-                ({secondInnings.overs}.{secondInnings.balls} ov)
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* TEAM B */}

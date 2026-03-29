@@ -10,7 +10,7 @@ import { grounds } from '@/mocks/data';
 
 type Step = 'basics' | 'teams' | 'toss' | 'players';
 
-const matchTypes: { key: CricketMatchType; label: string }[] = [
+export const matchTypes: { key: CricketMatchType; label: string }[] = [
   { key: 'long', label: 'Long Pitch' },
   { key: 'short', label: 'Short Pitch' },
 ];
@@ -103,7 +103,8 @@ export default function CreateMatchScreen() {
         currentStriker: openingBatsmen[0],
         currentNonStriker: openingBatsmen[1],
         currentBowler: openingBowler,
-        ballByBall: [],
+        allBalls: [],
+        thisOver: [],
         fallOfWickets: [],
       }],
       createdAt: new Date().toISOString(),
@@ -157,7 +158,7 @@ export default function CreateMatchScreen() {
             }
 
             setCurrentMatch({ ...updatedMatch, status: 'live', startedAt: new Date().toISOString() });
-            router.replace('/live-scoring');
+            router.replace('/match/live-scoring');
           },
         },
       ]

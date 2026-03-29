@@ -23,12 +23,13 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="match/(live_scoring)/live-scoring" options={{ headerShown: false, }} />
       <Stack.Screen name="match/[id]" options={{ title: 'Match Details' }} />
       <Stack.Screen name="player/[id]" options={{ title: 'Player Profile' }} />
       <Stack.Screen name="team/[id]" options={{ title: 'Team Details' }} />
       <Stack.Screen name="create-match" options={{ title: 'Create Match', presentation: 'modal' }} />
       <Stack.Screen name="live-scoring" options={{ title: 'Live Scoring', headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Stack.Screen name="notification" options={{ title: 'Notifications' }} />
     </Stack>
   );
 }

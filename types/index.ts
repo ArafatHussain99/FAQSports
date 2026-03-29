@@ -123,7 +123,8 @@ export interface CricketInnings {
   currentStriker?: string;
   currentNonStriker?: string;
   currentBowler?: string;
-  ballByBall: BallEvent[];
+  allBalls: BallEvent[];
+  thisOver: BallEvent[];
   fallOfWickets: FallOfWicket[];
 }
 

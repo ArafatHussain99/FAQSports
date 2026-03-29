@@ -615,22 +615,23 @@ export const mockLiveMatch: CricketMatch = {
       balls: 2,
       extras: { wides: 5, noBalls: 2, byes: 1, legByes: 3, total: 11 },
       batsmen: [
-        { playerId: 'p8', runs: 43, balls: 30, fours: 5, sixes: 2, strikeRate: 140.63, isOut: false },
+        { playerId: 'p8', runs: 42, balls: 32, fours: 5, sixes: 2, strikeRate: 140.63, isOut: false },
         { playerId: 'p9', runs: 23, balls: 16, fours: 3, sixes: 0, strikeRate: 146.67, isOut: true, dismissalType: 'caught', dismissedBy: 'p8', caughtBy: 'p8' },
         { playerId: 'p10', runs: 12, balls: 9, fours: 2, sixes: 0, strikeRate: 150, isOut: true, dismissalType: 'bowled', dismissedBy: 'p14' },
-        { playerId: 'p12', runs: 5, balls: 3, fours: 1, sixes: 0, strikeRate: 166.67, isOut: true, dismissalType: 'retired', dismissedBy: 'p7' },
+        { playerId: 'p12', runs: 5, balls: 3, fours: 1, sixes: 0, strikeRate: 166.67, isOut: false, dismissalType: 'retired', dismissedBy: 'p7' },
         { playerId: 'p14', runs: 38, balls: 28, fours: 4, sixes: 1, strikeRate: 135.71, isOut: false },
       ],
       bowlers: [
         { playerId: 'p1', overs: 4, balls: 0, maidens: 0, runs: 32, wickets: 1, economy: 8.0, wides: 2, noBalls: 0 },
         { playerId: 'p2', overs: 4, balls: 0, maidens: 1, runs: 24, wickets: 1, economy: 6.0, wides: 1, noBalls: 1 },
-        { playerId: 'p4', overs: 3, balls: 3, maidens: 0, runs: 28, wickets: 0, economy: 8.47, wides: 1, noBalls: 0 },
+        { playerId: 'p4', overs: 3, balls: 2, maidens: 0, runs: 28, wickets: 0, economy: 8.47, wides: 1, noBalls: 0 },
         { playerId: 'p5', overs: 3, balls: 0, maidens: 0, runs: 32, wickets: 0, economy: 10.67, wides: 1, noBalls: 1 },
       ],
       currentStriker: 'p8',
       currentNonStriker: 'p14',
       currentBowler: 'p4',
-      ballByBall: [],
+      allBalls: [],
+      thisOver: [],
       fallOfWickets: [
         { playerId: 'p2', runs: 45, overs: 5.3, wicketNumber: 1 },
         { playerId: 'p3', runs: 72, overs: 8.4, wicketNumber: 2 },
@@ -879,7 +880,9 @@ export const mockCompletedMatches: CricketMatch[] = [
 
         ],
 
-        ballByBall: [],
+        allBalls: [],
+
+        thisOver: [],
 
         fallOfWickets: [
 
@@ -1076,7 +1079,9 @@ export const mockCompletedMatches: CricketMatch[] = [
 
         ],
 
-        ballByBall: [],
+        allBalls: [],
+
+        thisOver: [],
 
         fallOfWickets: [
 
