@@ -83,6 +83,7 @@ export default function LiveScoringScreen() {
         currentMatch: match,
         updateLiveMatch,
         setLiveMatch,
+        getPlayerById,
         getTeamById,
         handleInningsEnd: handleInningsEndCallback,
         selectNewBowler: selectNewBowlerCallback,
@@ -288,11 +289,11 @@ export default function LiveScoringScreen() {
                   bowlingPlayers:
                     currentMatch.currentInnings === 1
                       ? currentMatch.playingXI_B.map((p: string) => {
-                          return getPlayerById(p);
-                        })
+                        return getPlayerById(p);
+                      })
                       : currentMatch.playingXI_A.map((p: string) => {
-                          return getPlayerById(p);
-                        }),
+                        return getPlayerById(p);
+                      }),
                 })
               }
             >

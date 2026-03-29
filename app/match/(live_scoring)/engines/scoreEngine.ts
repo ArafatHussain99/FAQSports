@@ -13,6 +13,7 @@ export interface ScoreEngineParams {
   updateLiveMatch: (match: CricketMatch) => void;
   setLiveMatch: (match: CricketMatch) => void;
   getTeamById: (id: string) => any;
+  getPlayerById: (id: string) => any;
   handleInningsEnd: (match: CricketMatch, battingTeamName: string | undefined) => void;
   selectNewBowler: (ctx: any) => void;
   setLastBalls: (fn: (prev: BallEvent[]) => BallEvent[]) => void;
@@ -30,7 +31,7 @@ export const handleScore = (
   extraType: 'wide' | 'no_ball' | 'bye' | 'leg_bye' | undefined,
   params: ScoreEngineParams
 ) => {
-  const { currentMatch, updateLiveMatch, setLiveMatch, getTeamById, handleInningsEnd, selectNewBowler, setLastBalls } = params;
+  const { currentMatch, updateLiveMatch, setLiveMatch, getTeamById, getPlayerById, handleInningsEnd, selectNewBowler, setLastBalls } = params;
 
   const match = currentMatch;
   if (!match) return;
@@ -74,13 +75,13 @@ export const handleScore = (
         selectNewBowler({
           innings,
           updatedMatch,
-          bowlingPlayers: updatedMatch.currentInnings === 1 
+          bowlingPlayers: updatedMatch.currentInnings === 1
             ? updatedMatch.playingXI_B.map((p: string) => {
-                return { id: p }; // This will be populated by getPlayerById in the component
-              })
+              return getPlayerById(p); // This will be populated by getPlayerById in the component
+            })
             : updatedMatch.playingXI_A.map((p: string) => {
-                return { id: p };
-              }),
+              return getPlayerById(p);
+            }),
         });
       }, 300);
     }

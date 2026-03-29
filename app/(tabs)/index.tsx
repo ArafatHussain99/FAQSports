@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Plus, WifiOff, ChevronRight, Trophy, Users, TrendingUp } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useApp, useMatches, useData } from '@/context/AppContext';
+import { useApp, useMatches, useFootballMatches, useData } from '@/context/AppContext';
+import { CricketMatch } from '@/types';
 import LiveMatchCard from '@/components/LiveMatchCard';
 import MatchCard from '@/components/MatchCard';
 
@@ -19,8 +20,9 @@ const sportIcons = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { role, userName, isAdmin, isOnline, isInitialized } = useApp();
+  const { role, userName, isAdmin, isOnline, isInitialized, currentSport, setCurrentSport } = useApp();
   const { liveMatch, upcomingMatches, completedMatches } = useMatches();
+  const { liveMatch: liveFootballMatch, upcomingMatches: upcomingFootballMatches, completedMatches: completedFootballMatches } = useFootballMatches();
   const { unreadCount, players, teams } = useData();
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -45,9 +47,44 @@ export default function HomeScreen() {
     );
   }
 
+  const getPlayerStat = (player: typeof players[0]) => {
+    switch (currentSport) {
+      case 'football':
+        return player.stats.goals || 0;
+      case 'table_tennis':
+        return player.stats.wins || 0;
+      case 'badminton':
+      case 'carrom':
+      case 'uno':
+        return player.stats.wins || 0;
+      default: // cricket
+        return player.stats.runs || 0;
+    }
+  };
+
+  const getStatLabel = () => {
+    switch (currentSport) {
+      case 'football':
+        return 'goals';
+      case 'table_tennis':
+        return 'wins';
+      case 'badminton':
+      case 'carrom':
+      case 'uno':
+        return 'wins';
+      default: // cricket
+        return 'runs';
+    }
+  };
+
   const topPlayers = [...players]
-    .sort((a, b) => b.stats.runs - a.stats.runs)
+    .sort((a, b) => getPlayerStat(b) - getPlayerStat(a))
     .slice(0, 3);
+
+  // Get sport-specific data
+  const currentLiveMatch = currentSport === 'cricket' ? liveMatch : currentSport === 'football' ? liveFootballMatch : null;
+  const currentUpcomingMatches = currentSport === 'cricket' ? upcomingMatches : currentSport === 'football' ? upcomingFootballMatches : [];
+  const currentCompletedMatches = currentSport === 'cricket' ? completedMatches : currentSport === 'football' ? completedFootballMatches : [];
 
   return (
     <View style={styles.container}>
@@ -95,11 +132,28 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Sports</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
             {sportIcons.map((sport) => (
-              <TouchableOpacity key={sport.id} style={styles.sportCard} activeOpacity={0.7}>
+              <TouchableOpacity
+                key={sport.id}
+                style={[
+                  styles.sportCard,
+                  currentSport === sport.id && styles.sportCardActive
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (['badminton', 'carrom', 'uno'].includes(sport.id)) {
+                    Alert.alert('Coming Soon', 'This sport will be available soon!');
+                  } else {
+                    setCurrentSport(sport.id as any);
+                  }
+                }}
+              >
                 <View style={[styles.sportIcon, { backgroundColor: `${sport.color}20` }]}>
                   <Text style={styles.sportEmoji}>{sport.emoji}</Text>
                 </View>
                 <Text style={styles.sportName}>{sport.name}</Text>
+                {currentSport === sport.id && (
+                  <View style={[styles.activeDot, { backgroundColor: sport.color }]} />
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -108,34 +162,42 @@ export default function HomeScreen() {
         {isAdmin && (
           <TouchableOpacity
             style={styles.createMatchBtn}
-            onPress={() => router.push('/create-match')}
+            onPress={() => {
+              if (currentSport === 'cricket') {
+                router.push('/create-match');
+              } else if (currentSport === 'football') {
+                router.push('/create-football-match' as any);
+              } else if (currentSport === 'table_tennis') {
+                router.push('/create-table-tennis-match' as any);
+              }
+            }}
             activeOpacity={0.8}
           >
             <View style={styles.createMatchContent}>
               <Plus size={24} color={Colors.text} />
               <View style={styles.createMatchText}>
-                <Text style={styles.createMatchTitle}>Create New Match</Text>
-                <Text style={styles.createMatchSubtitle}>Set up a cricket, football or other match</Text>
+                <Text style={styles.createMatchTitle}>Create {currentSport.charAt(0).toUpperCase() + currentSport.slice(1).replace(/_/g, ' ')} Match</Text>
+                <Text style={styles.createMatchSubtitle}>Set up a new match and manage teams</Text>
               </View>
             </View>
             <ChevronRight size={20} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
 
-        {liveMatch && (
+        {currentLiveMatch && currentSport === 'cricket' && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Live Now</Text>
               <View style={styles.livePulse} />
             </View>
-            <LiveMatchCard match={liveMatch} />
+            <LiveMatchCard match={currentLiveMatch as CricketMatch} />
           </View>
         )}
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Trophy size={24} color={Colors.primary} />
-            <Text style={styles.statNumber}>{completedMatches.length + (liveMatch ? 1 : 0) + upcomingMatches.length}</Text>
+            <Text style={styles.statNumber}>{currentCompletedMatches.length + (currentLiveMatch ? 1 : 0) + currentUpcomingMatches.length}</Text>
             <Text style={styles.statLabel}>Matches</Text>
           </View>
           <View style={styles.statCard}>
@@ -150,7 +212,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {upcomingMatches.length > 0 && (
+        {currentUpcomingMatches.length > 0 && currentSport === 'cricket' && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Upcoming</Text>
@@ -159,8 +221,8 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.matchesContainer}>
-              {upcomingMatches.slice(0, 2).map((match) => (
-                <MatchCard key={match.id} match={match} />
+              {currentUpcomingMatches.slice(0, 2).map((match) => (
+                <MatchCard key={match.id} match={match as CricketMatch} />
               ))}
             </View>
           </View>
@@ -189,7 +251,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
-                  <Text style={styles.playerStat}>{player.stats.runs} runs</Text>
+                  <Text style={styles.playerStat}>{getPlayerStat(player)} {getStatLabel()}</Text>
                 </View>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.ratingValue}>{player.ratings.overall}</Text>
@@ -200,7 +262,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {completedMatches.length > 0 && (
+        {currentCompletedMatches.length > 0 && currentSport === 'cricket' && (
           <View style={[styles.section, { marginBottom: 24 }]}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Recent Results</Text>
@@ -209,8 +271,8 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.matchesContainer}>
-              {completedMatches.slice(0, 2).map((match) => (
-                <MatchCard key={match.id} match={match} />
+              {currentCompletedMatches.slice(0, 2).map((match) => (
+                <MatchCard key={match.id} match={match as CricketMatch} />
               ))}
             </View>
           </View>
@@ -325,6 +387,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 72,
   },
+  sportCardActive: {
+    opacity: 1,
+  },
   sportIcon: {
     width: 56,
     height: 56,
@@ -340,6 +405,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: Colors.textSecondary,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
   },
   createMatchBtn: {
     flexDirection: 'row',

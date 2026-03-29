@@ -2,17 +2,19 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
-import { UserRole, CricketMatch, Notification, Player, Team } from '@/types';
+import { UserRole, CricketMatch, Notification, Player, Team, SportType, FootballMatch } from '@/types';
 import { mockPlayers, mockTeams, mockLiveMatch, mockUpcomingMatches, mockCompletedMatches, mockNotifications } from '@/mocks/data';
 
 const ROLE_STORAGE_KEY = 'user_role';
 const USER_NAME_KEY = 'user_name';
+const CURRENT_SPORT_KEY = 'current_sport';
 
 export const [AppProvider, useApp] = createContextHook(() => {
 
   const [isOnline, setIsOnline] = useState(true);
   const [role, setRoleState] = useState<UserRole | null>(null);
   const [userName, setUserNameState] = useState<string>('');
+  const [currentSport, setCurrentSportState] = useState<SportType>('cricket');
   const [isInitialized, setIsInitialized] = useState(false);
 
   const initQuery = useQuery({
@@ -20,7 +22,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     queryFn: async () => {
       const storedRole = await AsyncStorage.getItem(ROLE_STORAGE_KEY);
       const storedName = await AsyncStorage.getItem(USER_NAME_KEY);
-      return { role: storedRole as UserRole | null, name: storedName || '' };
+      const storedSport = (await AsyncStorage.getItem(CURRENT_SPORT_KEY)) as SportType | null;
+      return { role: storedRole as UserRole | null, name: storedName || '', sport: storedSport || 'cricket' };
     },
   });
 
@@ -28,6 +31,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     if (initQuery.data) {
       setRoleState(initQuery.data.role);
       setUserNameState(initQuery.data.name);
+      setCurrentSportState(initQuery.data.sport);
       setIsInitialized(true);
     }
   }, [initQuery.data]);
@@ -41,6 +45,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
     onSuccess: (data) => {
       setRoleState(data.role);
       setUserNameState(data.name);
+    },
+  });
+
+  const setSportMutation = useMutation({
+    mutationFn: async (sport: SportType) => {
+      await AsyncStorage.setItem(CURRENT_SPORT_KEY, sport);
+      return sport;
+    },
+    onSuccess: (sport) => {
+      setCurrentSportState(sport);
     },
   });
 
@@ -60,6 +74,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setRoleMutate({ role, name });
   }, [setRoleMutate]);
 
+  const { mutate: setSportMutate } = setSportMutation;
+  const setCurrentSport = useCallback((sport: SportType) => {
+    setSportMutate(sport);
+  }, [setSportMutate]);
+
   const { mutate: logoutMutate } = logoutMutation;
   const logout = useCallback(() => {
     logoutMutate();
@@ -73,12 +92,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
     userName,
     isAdmin,
     isPlayer,
+    currentSport,
+    setCurrentSport,
     isOnline,
     setIsOnline,
     setRole,
     logout,
     isInitialized,
-    isLoading: initQuery.isLoading || setRoleMutation.isPending,
+    isLoading: initQuery.isLoading || setRoleMutation.isPending || setSportMutation.isPending,
   };
 });
 
@@ -102,6 +123,51 @@ export const [MatchProvider, useMatches] = createContextHook(() => {
 
   const endMatch = useCallback((match: CricketMatch, winner: string, result: string) => {
     const completedMatch: CricketMatch = {
+      ...match,
+      status: 'completed',
+      winner,
+      result,
+      completedAt: new Date().toISOString(),
+    };
+    setCompletedMatches(prev => [completedMatch, ...prev]);
+    setLiveMatch(null);
+    setCurrentMatch(null);
+  }, []);
+
+  return {
+    liveMatch,
+    upcomingMatches,
+    completedMatches,
+    currentMatch,
+    setCurrentMatch,
+    startMatch,
+    updateLiveMatch,
+    endMatch,
+    setLiveMatch,
+    setUpcomingMatches,
+  };
+});
+
+export const [FootballMatchProvider, useFootballMatches] = createContextHook(() => {
+  const [liveMatch, setLiveMatch] = useState<FootballMatch | null>(null);
+  const [upcomingMatches, setUpcomingMatches] = useState<FootballMatch[]>([]);
+  const [completedMatches, setCompletedMatches] = useState<FootballMatch[]>([]);
+  const [currentMatch, setCurrentMatch] = useState<FootballMatch | null>(null);
+
+  const startMatch = useCallback((match: FootballMatch) => {
+    const updatedMatch = { ...match, status: 'live' as const, startedAt: new Date().toISOString() };
+    setLiveMatch(updatedMatch);
+    setCurrentMatch(updatedMatch);
+    setUpcomingMatches(prev => prev.filter(m => m.id !== match.id));
+  }, []);
+
+  const updateLiveMatch = useCallback((match: FootballMatch) => {
+    setLiveMatch(match);
+    setCurrentMatch(match);
+  }, []);
+
+  const endMatch = useCallback((match: FootballMatch, winner: string, result: string) => {
+    const completedMatch: FootballMatch = {
       ...match,
       status: 'completed',
       winner,

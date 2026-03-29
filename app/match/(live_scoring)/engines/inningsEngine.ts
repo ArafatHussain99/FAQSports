@@ -165,6 +165,7 @@ export const selectNewBowler = (
   const newBowler = bowlingPlayers.filter((player: Player) => player.id !== innings.currentBowler);
 
   const options = newBowler.map((p: any) => p.name);
+  console.log(options)
 
   showActionSheetWithOptions(
     {

@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AppProvider, MatchProvider, DataProvider } from "@/context/AppContext";
+import { AppProvider, MatchProvider, FootballMatchProvider, DataProvider } from "@/context/AppContext";
 import Colors from "@/constants/colors";
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
@@ -45,9 +45,11 @@ export default function RootLayout() {
         <AppProvider>
           <DataProvider>
             <MatchProvider>
-              <ActionSheetProvider>
-                <RootLayoutNav />
-              </ActionSheetProvider>
+              <FootballMatchProvider>
+                <ActionSheetProvider>
+                  <RootLayoutNav />
+                </ActionSheetProvider>
+              </FootballMatchProvider>
             </MatchProvider>
           </DataProvider>
         </AppProvider>
