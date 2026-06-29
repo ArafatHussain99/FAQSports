@@ -1,11 +1,12 @@
+import Colors from "@/constants/colors";
+import { AppProvider, DataProvider, FootballMatchProvider, MatchProvider, useApp } from "@/context/AppContext";
+import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AppProvider, MatchProvider, FootballMatchProvider, DataProvider } from "@/context/AppContext";
-import Colors from "@/constants/colors";
-import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +35,23 @@ function RootLayoutNav() {
   );
 }
 
+function GlobalLoadingOverlay() {
+  const { isGlobalLoading, globalLoadingMessage } = useApp();
+
+  if (!isGlobalLoading) {
+    return null;
+  }
+
+  return (
+    <View style={styles.loadingOverlay} pointerEvents="box-none">
+      <View style={styles.loadingCard}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>{globalLoadingMessage}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
@@ -47,7 +65,10 @@ export default function RootLayout() {
             <MatchProvider>
               <FootballMatchProvider>
                 <ActionSheetProvider>
-                  <RootLayoutNav />
+                  <View style={{ flex: 1 }}>
+                    <RootLayoutNav />
+                    <GlobalLoadingOverlay />
+                  </View>
                 </ActionSheetProvider>
               </FootballMatchProvider>
             </MatchProvider>
@@ -57,3 +78,27 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    zIndex: 999,
+  },
+  loadingCard: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    minWidth: 180,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

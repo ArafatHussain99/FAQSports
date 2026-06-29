@@ -21,8 +21,8 @@ export const selectOpeningStriker = (
 ) => {
   const { getPlayerById, updateLiveMatch, setLiveMatch, showActionSheetWithOptions } = params;
 
-  const battingPlayers = match.currentInnings === 1 ? match.playingXI_A : match.playingXI_B;
-  const bowlingPlayers = battingPlayers === match.playingXI_A ? match.playingXI_B : match.playingXI_A;
+  const battingPlayers = innings.battingTeam === match.teamA ? match.playingXI_A : match.playingXI_B;
+  const bowlingPlayers = innings.bowlingTeam === match.teamA ? match.playingXI_A : match.playingXI_B;
 
   const battingOptions = battingPlayers.map(id => getPlayerById(id)?.name!);
   const bowlingOptions = bowlingPlayers.map(id => getPlayerById(id)?.name!);
@@ -147,7 +147,7 @@ export const handleInningsEnd = (
         text: 'Finish',
         onPress: () => {
           endMatch(match, winner, result);
-          router.replace('/(tabs)');
+          router.replace('/');
         },
       },
     ]);
@@ -227,7 +227,7 @@ export const handleEndMatch = (
         const winner = team1Score >= team2Score ? currentMatch.teamA : currentMatch.teamB;
         const winnerTeam = getTeamById(winner);
         endMatch(currentMatch, winner, `${winnerTeam?.name} won`);
-        router.replace('/(tabs)');
+        router.replace('/');
       },
     },
   ]);

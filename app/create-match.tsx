@@ -5,8 +5,7 @@ import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useData, useMatches } from '@/context/AppContext';
-import { CricketMatch, CricketMatchType, TossDecision } from '@/types';
-import { grounds } from '@/mocks/data';
+import { CricketMatch, CricketMatchType, TossDecision, Substitute } from '@/types';
 
 type Step = 'basics' | 'teams' | 'toss' | 'players';
 
@@ -17,14 +16,14 @@ export const matchTypes: { key: CricketMatchType; label: string }[] = [
 
 export default function CreateMatchScreen() {
   const router = useRouter();
-  const { teams, getTeamPlayers, getTeamById } = useData();
+  const { teams, players, getTeamPlayers, getTeamById, grounds } = useData();
   const { setUpcomingMatches, setCurrentMatch } = useMatches();
 
   const [step, setStep] = useState<Step>('basics');
   const [matchType, setMatchType] = useState<CricketMatchType>('long');
   const [totalOvers, setTotalOvers] = useState('10');
   const [totalPlayersEachSide, setTotalPlayersEachSide] = useState('7');
-  const [selectedGround, setSelectedGround] = useState(grounds[0]);
+  const [selectedGround, setSelectedGround] = useState(grounds[0] || '');
   const [teamA, setTeamA] = useState('');
   const [teamB, setTeamB] = useState('');
   const [tossWinner, setTossWinner] = useState('');
@@ -33,11 +32,18 @@ export default function CreateMatchScreen() {
   const [playingXI_B, setPlayingXI_B] = useState<string[]>([]);
   const [openingBatsmen, setOpeningBatsmen] = useState<string[]>([]);
   const [openingBowler, setOpeningBowler] = useState('');
+  const [substitutes_A, setSubstitutes_A] = useState<Substitute[]>([]);
+  const [substitutes_B, setSubstitutes_B] = useState<Substitute[]>([]);
 
   const teamAData = teams.find(t => t.id === teamA);
   const teamBData = teams.find(t => t.id === teamB);
   const teamAPlayers = getTeamPlayers(teamA);
   const teamBPlayers = getTeamPlayers(teamB);
+  const availablePlayers = players.filter(p =>
+    (!p.teamId || (p.teamId !== teamA && p.teamId !== teamB)) &&
+    !substitutes_A.some(sub => sub.playerId === p.id) &&
+    !substitutes_B.some(sub => sub.playerId === p.id)
+  );
 
   const battingTeamId = tossDecision === 'bat' ? tossWinner : (tossWinner === teamA ? teamB : teamA);
   const bowlingTeamId = tossDecision === 'bowl' ? tossWinner : (tossWinner === teamA ? teamB : teamA);
@@ -53,7 +59,12 @@ export default function CreateMatchScreen() {
       case 'toss':
         return tossWinner && tossDecision;
       case 'players':
-        return playingXI_A.length >= 2 && playingXI_B.length >= 2 && openingBatsmen.length === 2 && openingBowler;
+        const totalA = playingXI_A.length + substitutes_A.length;
+        const totalB = playingXI_B.length + substitutes_B.length;
+        return playingXI_A.length >= 2 && playingXI_A.length <= parseInt(totalPlayersEachSide) &&
+          playingXI_B.length >= 2 && playingXI_B.length <= parseInt(totalPlayersEachSide) &&
+          totalA <= parseInt(totalPlayersEachSide) && totalB <= parseInt(totalPlayersEachSide) &&
+          openingBatsmen.length === 2 && openingBowler;
       default:
         return false;
     }
@@ -87,8 +98,8 @@ export default function CreateMatchScreen() {
       tossDecision,
       playingXI_A,
       playingXI_B,
-      substitutes_A: [],
-      substitutes_B: [],
+      substitutes_A,
+      substitutes_B,
       currentInnings: 1,
       innings: [{
         battingTeam: battingTeamId,
@@ -166,14 +177,27 @@ export default function CreateMatchScreen() {
   };
 
   const togglePlayerSelection = (playerId: string, team: 'A' | 'B') => {
+    const maxPlayers = parseInt(totalPlayersEachSide);
     if (team === 'A') {
-      setPlayingXI_A(prev =>
-        prev.includes(playerId) ? prev.filter(p => p !== playerId) : [...prev, playerId]
-      );
+      setPlayingXI_A(prev => {
+        const isSelected = prev.includes(playerId);
+        if (isSelected) {
+          return prev.filter(p => p !== playerId);
+        } else if (prev.length < maxPlayers) {
+          return [...prev, playerId];
+        }
+        return prev;
+      });
     } else {
-      setPlayingXI_B(prev =>
-        prev.includes(playerId) ? prev.filter(p => p !== playerId) : [...prev, playerId]
-      );
+      setPlayingXI_B(prev => {
+        const isSelected = prev.includes(playerId);
+        if (isSelected) {
+          return prev.filter(p => p !== playerId);
+        } else if (prev.length < maxPlayers) {
+          return [...prev, playerId];
+        }
+        return prev;
+      });
     }
   };
 
@@ -183,6 +207,103 @@ export default function CreateMatchScreen() {
       if (prev.length >= 2) return prev;
       return [...prev, playerId];
     });
+  };
+
+  const selectSubstituteWithTeamAndPermissions = (playerId: string) => {
+    const maxPlayers = parseInt(totalPlayersEachSide);
+
+    // Check if already selected by any team
+    const alreadySelectedInA = substitutes_A.some(sub => sub.playerId === playerId);
+    const alreadySelectedInB = substitutes_B.some(sub => sub.playerId === playerId);
+
+    if (alreadySelectedInA) {
+      Alert.alert('Player Already Selected', `This player is already selected as a substitute for ${teamAData?.name}.`);
+      return;
+    }
+
+    if (alreadySelectedInB) {
+      Alert.alert('Player Already Selected', `This player is already selected as a substitute for ${teamBData?.name}.`);
+      return;
+    }
+
+    // First step: Ask which team
+    Alert.alert(
+      'Assign to Team',
+      'Which team should this substitute be assigned to?',
+      [
+        {
+          text: teamAData?.name || 'Team A',
+          onPress: () => {
+            const totalA = playingXI_A.length + substitutes_A.length;
+            if (totalA >= maxPlayers) {
+              Alert.alert('Limit Reached', `${teamAData?.name} has reached the maximum of ${maxPlayers} players.`);
+              return;
+            }
+            askSubstitutePermissions(playerId, 'A');
+          },
+        },
+        {
+          text: teamBData?.name || 'Team B',
+          onPress: () => {
+            const totalB = playingXI_B.length + substitutes_B.length;
+            if (totalB >= maxPlayers) {
+              Alert.alert('Limit Reached', `${teamBData?.name} has reached the maximum of ${maxPlayers} players.`);
+              return;
+            }
+            askSubstitutePermissions(playerId, 'B');
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const askSubstitutePermissions = (playerId: string, team: 'A' | 'B') => {
+    Alert.alert(
+      'Substitute Capabilities',
+      'Select what this substitute can do:',
+      [
+        {
+          text: 'Bat & Bowl',
+          onPress: () => addSubstitute(playerId, team, true, true),
+        },
+        {
+          text: 'Bat Only',
+          onPress: () => addSubstitute(playerId, team, true, false),
+        },
+        {
+          text: 'Bowl Only',
+          onPress: () => addSubstitute(playerId, team, false, true),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const addSubstitute = (playerId: string, team: 'A' | 'B', canBat: boolean, canBowl: boolean) => {
+    const newSub: Substitute = { playerId, canBat, canBowl };
+    if (team === 'A') {
+      setSubstitutes_A(prev => [...prev, newSub]);
+    } else {
+      setSubstitutes_B(prev => [...prev, newSub]);
+    }
+  };
+
+  const removeSubstitute = (playerId: string) => {
+    const inTeamA = substitutes_A.findIndex(s => s.playerId === playerId);
+    const inTeamB = substitutes_B.findIndex(s => s.playerId === playerId);
+
+    if (inTeamA >= 0) {
+      setSubstitutes_A(prev => prev.filter(s => s.playerId !== playerId));
+    } else if (inTeamB >= 0) {
+      setSubstitutes_B(prev => prev.filter(s => s.playerId !== playerId));
+    }
   };
 
   return (
@@ -386,7 +507,7 @@ export default function CreateMatchScreen() {
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Select Playing XI</Text>
 
-            <Text style={styles.label}>{teamAData?.name} ({playingXI_A.length}/{totalPlayersEachSide})</Text>
+            <Text style={styles.label}>{teamAData?.name} ({playingXI_A.length + substitutes_A.length}/{totalPlayersEachSide})</Text>
             <View style={styles.playersList}>
               {teamAPlayers.map((player) => (
                 <TouchableOpacity
@@ -403,7 +524,7 @@ export default function CreateMatchScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>{teamBData?.name} ({playingXI_B.length}/{totalPlayersEachSide})</Text>
+            <Text style={styles.label}>{teamBData?.name} ({playingXI_B.length + substitutes_B.length}/{totalPlayersEachSide})</Text>
             <View style={styles.playersList}>
               {teamBPlayers.map((player) => (
                 <TouchableOpacity
@@ -424,7 +545,7 @@ export default function CreateMatchScreen() {
                 <Text style={styles.label}>Opening Batsmen ({openingBatsmen.length}/2)</Text>
                 <View style={styles.playersList}>
                   {battingTeamPlayers.map((playerId) => {
-                    const player = teamAPlayers.find(p => p.id === playerId) || teamBPlayers.find(p => p.id === playerId);
+                    const player = players.find(p => p.id === playerId);
                     if (!player) return null;
                     return (
                       <TouchableOpacity
@@ -436,12 +557,30 @@ export default function CreateMatchScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                  {(() => {
+                    const battingTeamSubs = battingTeamId === teamA ? substitutes_A : substitutes_B;
+                    return battingTeamSubs
+                      .filter(sub => sub.canBat)
+                      .map((sub) => {
+                        const player = players.find(p => p.id === sub.playerId);
+                        if (!player) return null;
+                        return (
+                          <TouchableOpacity
+                            key={`sub-${player.id}`}
+                            style={[styles.playerItem, openingBatsmen.includes(player.id) && styles.playerItemActive]}
+                            onPress={() => toggleOpeningBatsman(player.id)}
+                          >
+                            <Text style={styles.playerName}>{player.name} (Sub)</Text>
+                          </TouchableOpacity>
+                        );
+                      });
+                  })()}
                 </View>
 
                 <Text style={styles.label}>Opening Bowler</Text>
                 <View style={styles.playersList}>
                   {bowlingTeamPlayers.map((playerId) => {
-                    const player = teamAPlayers.find(p => p.id === playerId) || teamBPlayers.find(p => p.id === playerId);
+                    const player = players.find(p => p.id === playerId);
                     if (!player) return null;
                     return (
                       <TouchableOpacity
@@ -450,6 +589,54 @@ export default function CreateMatchScreen() {
                         onPress={() => setOpeningBowler(player.id)}
                       >
                         <Text style={styles.playerName}>{player.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {(() => {
+                    const bowlingTeamSubs = bowlingTeamId === teamA ? substitutes_A : substitutes_B;
+                    return bowlingTeamSubs
+                      .filter(sub => sub.canBowl)
+                      .map((sub) => {
+                        const player = players.find(p => p.id === sub.playerId);
+                        if (!player) return null;
+                        return (
+                          <TouchableOpacity
+                            key={`sub-${player.id}`}
+                            style={[styles.playerItem, openingBowler === player.id && styles.playerItemActive]}
+                            onPress={() => setOpeningBowler(player.id)}
+                          >
+                            <Text style={styles.playerName}>{player.name} (Sub)</Text>
+                          </TouchableOpacity>
+                        );
+                      });
+                  })()}
+                </View>
+
+                <Text style={styles.label}>Substitutes ({substitutes_A.length + substitutes_B.length})</Text>
+                <View style={styles.playersList}>
+                  {availablePlayers.map((player) => {
+                    const subInA = substitutes_A.find(s => s.playerId === player.id);
+                    const subInB = substitutes_B.find(s => s.playerId === player.id);
+                    const sub = subInA || subInB;
+                    const assignedTeam = subInA ? teamAData?.name : subInB ? teamBData?.name : null;
+
+                    return (
+                      <TouchableOpacity
+                        key={player.id}
+                        style={[styles.playerItem, sub && styles.playerItemActive]}
+                        onPress={() => sub ? removeSubstitute(player.id) : selectSubstituteWithTeamAndPermissions(player.id)}
+                      >
+                        <View>
+                          <Text style={styles.playerName}>{player.name}</Text>
+                          {sub && (
+                            <View>
+                              <Text style={styles.playerRole}>
+                                {assignedTeam} - {sub.canBat && sub.canBowl ? 'Bat & Bowl' : sub.canBat ? 'Bat Only' : 'Bowl Only'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.playerRole}>{player.position}</Text>
                       </TouchableOpacity>
                     );
                   })}

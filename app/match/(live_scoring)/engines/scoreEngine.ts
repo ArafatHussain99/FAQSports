@@ -71,19 +71,26 @@ export const handleScore = (
       innings.overs += 1;
       innings.balls = 0;
 
-      setTimeout(() => {
-        selectNewBowler({
-          innings,
-          updatedMatch,
-          bowlingPlayers: updatedMatch.currentInnings === 1
-            ? updatedMatch.playingXI_B.map((p: string) => {
-              return getPlayerById(p); // This will be populated by getPlayerById in the component
-            })
-            : updatedMatch.playingXI_A.map((p: string) => {
-              return getPlayerById(p);
-            }),
-        });
-      }, 300);
+      updatedMatch.innings[updatedMatch.currentInnings - 1] = innings;
+      updateLiveMatch(updatedMatch);
+
+      if (innings.overs >= updatedMatch.totalOvers) {
+        handleInningsEnd(updatedMatch, battingTeam?.name);
+      } else {
+        setTimeout(() => {
+          selectNewBowler({
+            innings,
+            updatedMatch,
+            bowlingPlayers: updatedMatch.currentInnings === 1
+              ? updatedMatch.playingXI_B.map((p: string) => {
+                return getPlayerById(p);
+              })
+              : updatedMatch.playingXI_A.map((p: string) => {
+                return getPlayerById(p);
+              }),
+          });
+        }, 300);
+      }
     }
   }
 
@@ -171,17 +178,12 @@ export const handleScore = (
 
   updatedMatch.innings[updatedMatch.currentInnings - 1] = innings;
 
-  if (innings.overs >= match.totalOvers) {
+  // Check for innings end due to score only (overs are handled when balls === 6)
+  if (match.innings[1] && match.innings[1].runs > match.innings[0].runs) {
     handleInningsEnd(updatedMatch, battingTeam?.name);
   } else {
-    if (match.innings[1]) {
-      if (match.innings[1].runs > match.innings[0].runs) {
-        handleInningsEnd(updatedMatch, battingTeam?.name);
-      }
-    } else {
-      updateLiveMatch(updatedMatch);
-      setLiveMatch(updatedMatch);
-    }
+    updateLiveMatch(updatedMatch);
+    setLiveMatch(updatedMatch);
   }
 };
 

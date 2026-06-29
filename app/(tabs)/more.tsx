@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Trophy, Users, Bell, BarChart3, FileText,
-  HelpCircle, Mail, ChevronRight, Gamepad2, LucideIcon
+  HelpCircle, Mail, ChevronRight, Gamepad2, LucideIcon, MapPin
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp, useData } from '@/context/AppContext';
@@ -63,6 +63,7 @@ export default function MoreScreen() {
       items: [
         { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', color: Colors.adminBadge, onPress: () => router.push('/create-match') },
         { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', color: Colors.primary, onPress: () => router.push('/teams') },
+        { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', color: Colors.secondary, onPress: () => router.push('/manage-stadiums') },
       ],
     });
   }

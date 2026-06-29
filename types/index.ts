@@ -100,6 +100,12 @@ export interface Tournament {
   winner?: string;
 }
 
+export interface Substitute {
+  playerId: string;
+  canBat: boolean;
+  canBowl: boolean;
+}
+
 export interface CricketMatch {
   id: string;
   sport: 'cricket';
@@ -113,8 +119,8 @@ export interface CricketMatch {
   tossDecision: TossDecision;
   playingXI_A: string[];
   playingXI_B: string[];
-  substitutes_A: string[];
-  substitutes_B: string[];
+  substitutes_A: Substitute[];
+  substitutes_B: Substitute[];
   currentInnings: 1 | 2;
   innings: CricketInnings[];
   winner?: string;

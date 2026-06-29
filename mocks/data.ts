@@ -627,7 +627,7 @@ export const mockLiveMatch: CricketMatch = {
       balls: 2,
       extras: { wides: 5, noBalls: 2, byes: 1, legByes: 3, total: 11 },
       batsmen: [
-        { playerId: 'p8', runs: 42, balls: 33, fours: 5, sixes: 2, strikeRate: 140.63, isOut: false },
+        { playerId: 'p8', runs: 42, balls: 34, fours: 5, sixes: 2, strikeRate: 140.63, isOut: false },
         { playerId: 'p9', runs: 23, balls: 17, fours: 3, sixes: 0, strikeRate: 146.67, isOut: true, dismissalType: 'caught', dismissedBy: 'p8', caughtBy: 'p8' },
         { playerId: 'p10', runs: 12, balls: 9, fours: 2, sixes: 0, strikeRate: 150, isOut: true, dismissalType: 'bowled', dismissedBy: 'p14' },
         { playerId: 'p12', runs: 5, balls: 3, fours: 1, sixes: 0, strikeRate: 166.67, isOut: false, dismissalType: 'retired', dismissedBy: 'p7' },
