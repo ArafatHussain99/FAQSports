@@ -1,6 +1,7 @@
 import Colors from '@/constants/colors';
 import { useApp, useData } from '@/context/AppContext';
 import { Player } from '@/types';
+import { TypePlayerInfo } from '@/types/player';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Plus, Trash2, Users, X } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
@@ -19,6 +20,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { deletePlayerInfo, uploadPlayerInfo } from '../api/playerApi';
 import { deleteTeamInfo, uploadTeamInfo } from '../api/teamApi';
 
 type TabType = 'teams' | 'players';
@@ -109,7 +111,7 @@ function SwipeableCard({ children, onDelete, isAdmin }: SwipeableCardProps) {
 export default function TeamsScreen() {
   const router = useRouter();
   const { isAdmin, runWithGlobalLoading } = useApp();
-  const { teams, players, getTeamPlayers, addPlayer, updatePlayer, deletePlayer, addTeam, updateTeam, deleteTeam, refetchTeams, refetchPlayers } = useData();
+  const { teams, players, getTeamPlayers, refetchTeams, refetchPlayers } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('teams');
   const [refreshing, setRefreshing] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -142,96 +144,45 @@ export default function TeamsScreen() {
     return `p${maxId + 1}`;
   };
 
-  // Get next team ID
-  const getNextTeamId = () => {
-    const maxId = Math.max(0, ...teams.map(t => parseInt(t.id.replace('t', '')) || 0));
-    return `t${maxId + 1}`;
-  };
-
   const handleAddPlayer = () => {
     if (!newPlayerName.trim()) {
       Alert.alert('Error', 'Please enter player name');
       return;
     }
 
-    const newPlayer: Player = {
+    const newPlayer: TypePlayerInfo = {
       id: getNextPlayerId(),
       name: newPlayerName,
-      teamId: newPlayerTeamId || undefined,
+      cricket_team: newPlayerTeamId || undefined,
       position: newPlayerPosition,
-      battingStyle: newPlayerBatting as 'right' | 'left',
-      bowlingStyle: newPlayerBowling,
-      stats: {
-        matches: 0,
-        runs: 0,
-        balls: 0,
-        wickets: 0,
-        catches: 0,
-        runOuts: 0,
-        stumpings: 0,
-        highestScore: 0,
-        bestBowling: '-',
-        fifties: 0,
-        centuries: 0,
-        average: 0,
-        strikeRate: 0,
-        economyRate: 0,
-        goals: 0,
-        assists: 0,
-        wins: 0,
-      },
+      batting_style: newPlayerBatting as 'right' | 'left',
+      bowling_style: newPlayerBowling,
       ratings: { batting: 0, bowling: 0, fielding: 0, overall: 0 },
-      lastFivePerformances: [],
     };
 
-    addPlayer(newPlayer);
+    // const newPlayerStats: TypePlayerStats = {
+    //   matches: 0,
+    //   runs: 0,
+    //   balls: 0,
+    //   wickets: 0,
+    //   catches: 0,
+    //   runOuts: 0,
+    //   stumpings: 0,
+    //   highestScore: 0,
+    //   bestBowlingWickets: 0,
+    //   bestBowlingRuns: 0,
+    //   fifties: 0,
+    //   centuries: 0,
+    //   average: 0,
+    //   strikeRate: 0,
+    //   economyRate: 0,
+    //   goals: 0,
+    //   assists: 0,
+    //   wins: 0,
+    // }
 
-    // If a team is selected, add player to team's roster
-    if (newPlayerTeamId) {
-      const team = teams.find(t => t.id === newPlayerTeamId);
-      if (team) {
-        updateTeam(newPlayerTeamId, {
-          players: [...team.players, newPlayer.id],
-        });
-      }
-    }
+    uploadPlayerInfo(newPlayer);
 
-    // Reset form
-    setNewPlayerName('');
-    setNewPlayerPosition('');
-    setNewPlayerTeamId('');
-    setNewPlayerBatting('right');
-    setNewPlayerBowling('');
-    setModalType(null);
-
-    Alert.alert('Success', `Player ${newPlayerName} added successfully!`);
-  };
-
-  const handleUpdatePlayerTeam = (player: Player, teamId: string | null) => {
-    const oldTeamId = player.teamId;
-
-    // Update player's team
-    updatePlayer(player.id, { teamId: teamId || undefined });
-
-    // Remove from old team if exists
-    if (oldTeamId) {
-      const oldTeam = teams.find(t => t.id === oldTeamId);
-      if (oldTeam) {
-        updateTeam(oldTeamId, {
-          players: oldTeam.players.filter(id => id !== player.id),
-        });
-      }
-    }
-
-    // Add to new team if selected
-    if (teamId) {
-      const newTeam = teams.find(t => t.id === teamId);
-      if (newTeam && !newTeam.players.includes(player.id)) {
-        updateTeam(teamId, {
-          players: [...newTeam.players, player.id],
-        });
-      }
-    }
 
     setEditingPlayer(null);
     setModalType(null);
@@ -302,7 +253,7 @@ export default function TeamsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            deletePlayer(player.id);
+            deletePlayerInfo(player.id);
             Alert.alert('Success', `Player ${player.name} deleted successfully!`);
           },
         },
@@ -594,7 +545,7 @@ export default function TeamsScreen() {
                 styles.teamListItem,
                 !editingPlayer?.teamId && styles.teamListItemActive,
               ]}
-              onPress={() => editingPlayer && handleUpdatePlayerTeam(editingPlayer, null)}
+              onPress={() => editingPlayer}
             >
               <View style={styles.teamListItemContent}>
                 <Text
@@ -618,7 +569,7 @@ export default function TeamsScreen() {
                   styles.teamListItem,
                   editingPlayer?.teamId === team.id && styles.teamListItemActive,
                 ]}
-                onPress={() => editingPlayer && handleUpdatePlayerTeam(editingPlayer, team.id)}
+                onPress={() => editingPlayer}
               >
                 <View style={[styles.teamListItemDot, { backgroundColor: team.color }]} />
                 <View style={styles.teamListItemContent}>
