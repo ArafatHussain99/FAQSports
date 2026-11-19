@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { BallEvent, CricketMatch } from '@/types';
+import { BallEvent, CricketMatch } from '../types';
 
 export const triggerHaptic = () => {
   if (Platform.OS !== 'web') {

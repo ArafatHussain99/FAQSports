@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Calendar, MapPin, Trophy } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { CricketMatch, CricketMatchType } from '@/types';
+import { CricketMatch, CricketMatchType } from '../types';
 import { useData } from '@/context/AppContext';
 
 interface Props {
@@ -43,7 +43,7 @@ export default function MatchCard({ match }: Props) {
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => router.push(`/match/${match.id}`)}
+      onPress={() => router.push(`/cricket/match/${match.id}`)}
       activeOpacity={0.7}
     >
       <View style={styles.header}>

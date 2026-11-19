@@ -1,4 +1,5 @@
-import { Player, Team, CricketMatch, Notification, Tournament } from '@/types';
+import { CricketMatch } from '@/sports/cricket/types';
+import { Notification, Player, Team, Tournament } from '@/types';
 
 export const mockPlayers: Player[] = [
   // =====================

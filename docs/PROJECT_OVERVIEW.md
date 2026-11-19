@@ -70,7 +70,7 @@ Cricket is the most complete sport. The scorer can record:
 
 Each innings tracks totals, extras, batsman and bowler figures, the current over and the fall of wickets. Matches can be **long** or **short** format, with a configurable number of overs. Every ball is saved to Supabase (`ball_info` table), with optional commentary.
 
-The scoring rules live in `app/match/(live_scoring)/engines/` (`scoreEngine`, `wicketEngine` and `inningsEngine`), separate from the screen.
+The scoring rules live in `sports/cricket/engines/` (`scoreEngine`, `wicketEngine` and `inningsEngine`), separate from the screen.
 
 ## 6. Data model
 
@@ -109,7 +109,7 @@ The TypeScript types for all of these are in `types/`.
 | Icons | lucide-react-native |
 | Testing | Jest (`jest-expo`) + React Native Testing Library |
 
-See `CLAUDE.md` for commands, folder structure and coding conventions.
+Code for each sport lives in its own folder under `sports/` (`cricket/`, `football/`, `table-tennis/`), and shared code lives in `api/`, `context/` and `types/`. See `CLAUDE.md` for the full folder structure, commands and coding conventions.
 
 ## 8. Known gaps and next steps
 
@@ -119,5 +119,5 @@ See `CLAUDE.md` for commands, folder structure and coding conventions.
 - **Inconsistent "Coming soon" labels:** the More tab marks Football and Table Tennis as "Coming soon", but they can be selected on Home and have create screens.
 - **Unfinished menu items:** Tournaments, Leaderboards, FAQ and Terms of Service are not wired up yet. Tournaments already has a data type.
 - **Placeholder support email:** Contact Support uses `support@company.com`.
-- **Secrets in logs:** `app/api/supabaseClient.ts` logs the Supabase URL and anon key to the console.
-- **Tests:** there is only one test (home screen). The scoring engines would benefit most from unit tests.
+- **Secrets in logs:** `api/supabaseClient.ts` logs the Supabase URL and anon key to the console.
+- **Tests:** there is only one test (home screen), and it currently cannot run: Jest's `transformIgnorePatterns` doesn't include `@nkzw/create-context-hook`, and the Supabase env vars aren't set for tests. The scoring engines would benefit most from unit tests.

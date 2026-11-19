@@ -4,16 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
-import { useApp, useMatches } from '@/context/AppContext';
-import LiveMatchCard from '@/components/LiveMatchCard';
-import MatchCard from '@/components/MatchCard';
+import { useApp } from '@/context/AppContext';
+import { useCricketMatches } from '@/sports/cricket/context';
+import LiveMatchCard from '@/sports/cricket/components/LiveMatchCard';
+import MatchCard from '@/sports/cricket/components/MatchCard';
 
 type FilterType = 'all' | 'live' | 'upcoming' | 'completed';
 
 export default function MatchesScreen() {
   const router = useRouter();
   const { isAdmin } = useApp();
-  const { liveMatch, upcomingMatches, completedMatches } = useMatches();
+  const { liveMatch, upcomingMatches, completedMatches } = useCricketMatches();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -37,7 +38,7 @@ export default function MatchesScreen() {
           {isAdmin && (
             <TouchableOpacity
               style={styles.addBtn}
-              onPress={() => router.push('/create-match')}
+              onPress={() => router.push('/cricket/create-match')}
             >
               <Plus size={20} color={Colors.text} />
             </TouchableOpacity>

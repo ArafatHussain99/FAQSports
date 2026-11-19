@@ -3,11 +3,12 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Calendar, MapPin, Trophy, Play, Target } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useMatches, useData, useApp } from '@/context/AppContext';
+import { useData, useApp } from '@/context/AppContext';
+import { useCricketMatches } from '../context';
 import { mockPlayers } from '@/mocks/data';
-import { BatsmanScore } from '@/types';
-import { getMatches } from '../api/matchesApi';
-import { matchTypes } from '../create-match';
+import { BatsmanScore } from '../types';
+import { getMatches } from '../api';
+import { matchTypes } from '../constants';
 
 type TabType = 'scorecard' | 'info' | 'commentary';
 
@@ -15,7 +16,7 @@ export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isAdmin } = useApp();
-  const { liveMatch, upcomingMatches, completedMatches, setCurrentMatch } = useMatches();
+  const { liveMatch, upcomingMatches, completedMatches, setCurrentMatch } = useCricketMatches();
   const { getTeamById, getPlayerById } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('scorecard');
 
@@ -54,7 +55,7 @@ export default function MatchDetailScreen() {
 
   const handleStartScoring = () => {
     setCurrentMatch({ ...match, status: 'live', startedAt: new Date().toISOString() });
-    router.push('/match/live-scoring');
+    router.push('/cricket/live-scoring');
   };
 
   const formatDate = (dateStr: string) => {

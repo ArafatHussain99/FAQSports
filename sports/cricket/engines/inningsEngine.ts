@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
-import { CricketInnings, CricketMatch, Player } from '@/types';
+import { Player } from '@/types';
+import { CricketInnings, CricketMatch } from '../types';
 import { triggerHaptic } from './scoreEngine';
 
 export interface InningsEngineParams {

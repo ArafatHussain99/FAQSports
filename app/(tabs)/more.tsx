@@ -61,7 +61,7 @@ export default function MoreScreen() {
     menuSections.splice(1, 0, {
       title: 'Admin Tools',
       items: [
-        { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', color: Colors.adminBadge, onPress: () => router.push('/create-match') },
+        { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', color: Colors.adminBadge, onPress: () => router.push('/cricket/create-match') },
         { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', color: Colors.primary, onPress: () => router.push('/teams') },
         { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', color: Colors.secondary, onPress: () => router.push('/manage-stadiums') },
       ],

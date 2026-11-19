@@ -12,7 +12,7 @@ export default function NotificationsScreen() {
   const handleNotificationPress = (notification: typeof notifications[0]) => {
     markNotificationRead(notification.id);
     if (notification.matchId) {
-      router.push(`/match/${notification.matchId}`);
+      router.push(`/cricket/match/${notification.matchId}`);
     }
   };
 

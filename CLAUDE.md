@@ -49,58 +49,82 @@ EXPO_PUBLIC_SUPABASE_URL=...
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-Never commit `.env` or hard-code keys. Note: `app/api/supabaseClient.ts` currently `console.log`s both values — don't add more logging of secrets.
+Never commit `.env` or hard-code keys. Note: `api/supabaseClient.ts` currently `console.log`s both values — don't add more logging of secrets.
 
 ## 5. Project Structure
 
+Code is split into **shared** code and **per-sport** folders under `sports/`. `app/` holds routes only.
+
 ```
-app/                          Expo Router routes (every file here is a route)
+app/                          Expo Router routes ONLY (every file here becomes a URL)
   _layout.tsx                 Root Stack + provider tree + global loading overlay
   (tabs)/                     Bottom tabs: index (Home), matches, teams, profile, more
-  login.tsx                   Supabase email/password sign-in & sign-up
-  create-match.tsx            Create cricket match
-  create-football-match.tsx   Create football match
-  create-table-tennis-match.tsx
-  manage-stadiums.tsx         Grounds/stadium management
-  match/[id].tsx              Match details
-  match/(live_scoring)/
-    live-scoring.tsx          Cricket live-scoring screen
-    engines/                  Pure-ish cricket scoring logic
-      scoreEngine.ts          runs, extras (wide/no-ball/bye/leg-bye), haptics
+  login.tsx, manage-stadiums.tsx, notification.tsx
+  player/[id].tsx, team/[id].tsx
+  cricket/                    Thin route files that re-export screens from sports/cricket
+    create-match.tsx          -> /cricket/create-match
+    live-scoring.tsx          -> /cricket/live-scoring
+    match/[id].tsx            -> /cricket/match/:id
+  football/create-match.tsx   -> /football/create-match
+  table-tennis/create-match.tsx -> /table-tennis/create-match
+
+sports/                       Everything specific to one sport lives in its folder
+  cricket/
+    screens/                  CreateMatchScreen, LiveScoringScreen, MatchDetailsScreen
+    components/               MatchCard, LiveMatchCard
+    engines/                  Scoring logic, kept out of the screen
+      scoreEngine.ts          runs, extras (wide/no-ball/bye/leg-bye), undo, haptics
       wicketEngine.ts         dismissals
-      inningsEngine.ts        innings transitions / match end
-  player/[id].tsx, team/[id].tsx, notification.tsx
-  api/                        Supabase data-access layer
-    supabaseClient.ts         single shared Supabase client
-    matchesApi.ts             auth (signUp/signIn/signOut/getUserRole), matches,
-                              ball_info, teams, players, player_stats, grounds
-    playerApi.ts, teamApi.ts  player/team insert & delete
-components/                   Shared UI (MatchCard, LiveMatchCard)
-constants/colors.tsx          Color tokens (incl. per-sport colors) — use these, not raw hex
+      inningsEngine.ts        strike rotation, new bowler, innings change, match end
+    api.ts                    getMatches, uploadBallInfo (`matches`, `ball_info` tables)
+    context.tsx               CricketMatchProvider / useCricketMatches
+    constants.ts              matchTypes (long / short pitch)
+    types.ts                  CricketMatch, CricketInnings, BallEvent, ... + TypeBallInfo
+  football/
+    screens/CreateMatchScreen.tsx
+    context.tsx               FootballMatchProvider / useFootballMatches
+    types.ts                  FootballMatch, FootballEvent, ...
+  table-tennis/
+    screens/CreateMatchScreen.tsx
+
+api/                          Shared Supabase data access (not sport-specific)
+  supabaseClient.ts           single shared Supabase client
+  authApi.ts                  signUp, signIn, signOut, getCurrentUser, getUserRole
+  teamApi.ts                  getTeams, uploadTeamInfo, deleteTeamInfo
+  playerApi.ts                getPlayers, getTeamPlayers, uploadPlayerInfo, uploadPlayerStats, deletePlayerInfo
+  groundApi.ts                getGrounds, addGround
+context/AppContext.tsx        AppProvider/useApp (role, user, current sport, global loading),
+                              DataProvider/useData (players, teams, grounds, notifications)
+types/                        Shared types: index.ts (SportType, UserRole, MatchStatus, Player,
+                              Team, Tournament, Notification, ...); player.ts / team.ts hold
+                              Supabase row payload types
+constants/colors.tsx          Color tokens (incl. per-sport colors). Use these, not raw hex
 constants/theme.ts            Expo template theme (mostly unused)
-context/AppContext.tsx        AppProvider/useApp, DataProvider/useData,
-                              MatchProvider/useMatches, FootballMatchProvider/useFootballMatches
-types/                        Shared types (index.ts: SportType, UserRole, Player, Team,
-                              CricketMatch, FootballMatch, BallEvent, ...; match/player/team.ts
-                              hold Supabase row payload types)
 mocks/data.ts                 Mock data still used by some screens/context
 hooks/                        Color-scheme helpers
 __tests__/                    Jest tests
 ```
 
-Path alias: `@/*` maps to the repo root (e.g. `import Colors from '@/constants/colors'`).
+Path alias: `@/*` maps to the repo root (e.g. `import Colors from '@/constants/colors'`). Inside a sport folder, use relative imports (`../types`, `../context`); from outside, import via `@/sports/<sport>/...`.
+
+**Where does new code go?**
+- Used by one sport only → `sports/<sport>/` (screens, components, engines, api, context, types).
+- Used by several sports or none (auth, teams, players, grounds) → `api/`, `context/`, `types/`, `constants/`.
+- A new screen → write it in `sports/<sport>/screens/`, then add a one-line route file in `app/<sport>/` (`export { default } from '@/sports/<sport>/screens/XScreen';`) and register it in the `<Stack>` in `app/_layout.tsx`.
+- Never put non-route files (helpers, API, engines) under `app/`: Expo Router treats them as routes.
 
 ## 6. Architecture Notes
 
-- **Provider order** (in `app/_layout.tsx`): `QueryClientProvider` → `GestureHandlerRootView` → `AppProvider` → `DataProvider` → `MatchProvider` → `FootballMatchProvider` → `ActionSheetProvider`. New providers go in this tree.
+- **Provider order** (in `app/_layout.tsx`): `QueryClientProvider` → `GestureHandlerRootView` → `AppProvider` → `DataProvider` → `CricketMatchProvider` → `FootballMatchProvider` → `ActionSheetProvider`. A new sport's provider goes in this tree.
 - **New routes** must also be registered in the `<Stack>` in `app/_layout.tsx` if they need custom header/presentation options.
-- **Data access:** screens should call functions in `app/api/*` (or the context hooks), never `supabase` directly. API functions log the error and `throw` it; callers handle it (usually via `Alert`).
+- **Data access:** screens should call functions in `api/*` or `sports/<sport>/api.ts` (or the context hooks), never `supabase` directly. API functions log the error and `throw` it; callers handle it (usually via `Alert`).
 - **Supabase tables in use:** `profiles`, `matches`, `ball_info`, `teams`, `players`, `player_stats`, `grounds`.
 - **Auth & roles:** sign in via Supabase Auth, then `getUserRole` reads `profiles` to get `'admin' | 'player'`. Role, user name and current sport are persisted in `AsyncStorage` through `useApp()`.
 - **Global loading:** wrap async work with `runWithGlobalLoading(fn, message)` from `useApp()` to show the overlay.
-- **Sport switching:** `currentSport` (`SportType`) from `useApp()` drives which stats/screens are shown. When adding a sport, update `SportType` in `types/index.ts`, the sports list and switch statements in `app/(tabs)/index.tsx`, colors in `constants/colors.tsx`, and add create/scoring screens.
-- **Cricket scoring:** keep scoring rules in `app/match/(live_scoring)/engines/*`; the screen passes state setters in via params objects (`ScoreEngineParams`, etc.). Ball events are uploaded with `uploadBallInfo`.
-- **Mock data migration:** parts of the app still read from `mocks/data.ts` (e.g. matches/notifications in `AppContext`, grounds in create-football/TT screens). Prefer replacing mocks with Supabase-backed data when touching those areas.
+- **Sport switching:** `currentSport` (`SportType`) from `useApp()` drives which stats/screens are shown.
+- **Adding a sport** (e.g. badminton): create `sports/badminton/` following the cricket layout, add route files under `app/badminton/` and register them in `app/_layout.tsx`, update `SportType` in `types/index.ts`, the sports list and switch statements in `app/(tabs)/index.tsx` and `app/(tabs)/more.tsx`, and colors in `constants/colors.tsx`.
+- **Cricket scoring:** keep scoring rules in `sports/cricket/engines/*`; the screen passes state setters in via params objects (`ScoreEngineParams`, etc.). Ball events are uploaded with `uploadBallInfo` from `sports/cricket/api.ts`.
+- **Mock data migration:** parts of the app still read from `mocks/data.ts` (cricket matches in `sports/cricket/context.tsx`, notifications in `AppContext`, grounds in the football and table tennis create screens). Prefer replacing mocks with Supabase-backed data when touching those areas.
 
 ## 7. Conventions
 
@@ -108,5 +132,5 @@ Path alias: `@/*` maps to the repo root (e.g. `import Colors from '@/constants/c
 - Styles via `StyleSheet.create` in the same file; colors from `Colors`.
 - Use `SafeAreaView` from `react-native-safe-area-context`.
 - Guard native-only APIs (e.g. haptics) with `Platform.OS !== 'web'`.
-- Keep types in `types/` and import with `@/types`.
+- Shared types go in `types/` (import with `@/types`); sport-specific types go in `sports/<sport>/types.ts`.
 - Run `npm run lint` and `npx tsc --noEmit` before finishing a change.
