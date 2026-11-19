@@ -133,6 +133,10 @@ export default function PlayerProfileScreen() {
               <Text style={styles.statBoxLabel}>Runs</Text>
             </View>
             <View style={styles.statBox}>
+              <Text style={styles.statBoxValue}>{player.stats.balls}</Text>
+              <Text style={styles.statBoxLabel}>Balls</Text>
+            </View>
+            <View style={styles.statBox}>
               <Text style={styles.statBoxValue}>{player.stats.average.toFixed(1)}</Text>
               <Text style={styles.statBoxLabel}>Average</Text>
             </View>
@@ -187,6 +191,24 @@ export default function PlayerProfileScreen() {
             <View style={styles.statBox}>
               <Text style={styles.statBoxValue}>{player.stats.stumpings}</Text>
               <Text style={styles.statBoxLabel}>Stumpings</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Other Stats</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxValue}>{player.stats.goals ?? 0}</Text>
+              <Text style={styles.statBoxLabel}>Goals</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxValue}>{player.stats.assists ?? 0}</Text>
+              <Text style={styles.statBoxLabel}>Assists</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxValue}>{player.stats.wins ?? 0}</Text>
+              <Text style={styles.statBoxLabel}>Wins</Text>
             </View>
           </View>
         </View>

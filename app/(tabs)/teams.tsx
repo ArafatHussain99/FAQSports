@@ -20,7 +20,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { deletePlayerInfo, uploadPlayerInfo } from '../api/playerApi';
+import { deletePlayerInfo, uploadPlayerInfo, uploadPlayerStats } from '../api/playerApi';
 import { deleteTeamInfo, uploadTeamInfo } from '../api/teamApi';
 
 type TabType = 'teams' | 'players';
@@ -123,6 +123,7 @@ export default function TeamsScreen() {
   const [newPlayerTeamId, setNewPlayerTeamId] = useState<string>('');
   const [newPlayerBatting, setNewPlayerBatting] = useState('right');
   const [newPlayerBowling, setNewPlayerBowling] = useState('');
+  const [isSavingPlayer, setIsSavingPlayer] = useState(false);
 
   // Add Team Form State
   const [newTeamName, setNewTeamName] = useState('');
@@ -138,54 +139,65 @@ export default function TeamsScreen() {
     }
   }, [refetchTeams, refetchPlayers, runWithGlobalLoading]);
 
-  // Get next player ID
-  const getNextPlayerId = () => {
-    const maxId = Math.max(0, ...players.map(p => parseInt(p.id.replace('p', '')) || 0));
-    return `p${maxId + 1}`;
-  };
-
-  const handleAddPlayer = () => {
-    if (!newPlayerName.trim()) {
+  const handleAddPlayer = async () => {
+    const name = newPlayerName.trim();
+    if (!name) {
       Alert.alert('Error', 'Please enter player name');
       return;
     }
 
     const newPlayer: TypePlayerInfo = {
-      id: getNextPlayerId(),
-      name: newPlayerName,
-      cricket_team: newPlayerTeamId || undefined,
-      position: newPlayerPosition,
-      batting_style: newPlayerBatting as 'right' | 'left',
-      bowling_style: newPlayerBowling,
-      ratings: { batting: 0, bowling: 0, fielding: 0, overall: 0 },
+      name,
+      team_id: newPlayerTeamId || null,
+      position: newPlayerPosition.trim() || null,
+      batting_style: newPlayerBatting || null,
+      bowling_style: newPlayerBowling.trim() || null,
     };
 
-    // const newPlayerStats: TypePlayerStats = {
-    //   matches: 0,
-    //   runs: 0,
-    //   balls: 0,
-    //   wickets: 0,
-    //   catches: 0,
-    //   runOuts: 0,
-    //   stumpings: 0,
-    //   highestScore: 0,
-    //   bestBowlingWickets: 0,
-    //   bestBowlingRuns: 0,
-    //   fifties: 0,
-    //   centuries: 0,
-    //   average: 0,
-    //   strikeRate: 0,
-    //   economyRate: 0,
-    //   goals: 0,
-    //   assists: 0,
-    //   wins: 0,
-    // }
-
-    uploadPlayerInfo(newPlayer);
-
-
-    setEditingPlayer(null);
-    setModalType(null);
+    setIsSavingPlayer(true);
+    try {
+      await runWithGlobalLoading(async () => {
+        const playerId = await uploadPlayerInfo(newPlayer);
+        await uploadPlayerStats({
+          player_id: playerId,
+          matches: 0,
+          runs: 0,
+          balls: 0,
+          wickets: 0,
+          catches: 0,
+          run_outs: 0,
+          stumpings: 0,
+          highest_score: 0,
+          best_bowling_wickets: 0,
+          fifties: 0,
+          centuries: 0,
+          batting_average: 0,
+          strike_rate: 0,
+          economy_rate: 0,
+          goals: 0,
+          assists: 0,
+          wins: 0,
+          best_bowling_runs: 0,
+        });
+        await refetchPlayers();
+      }, 'Adding player...');
+      setNewPlayerName('');
+      setNewPlayerPosition('');
+      setNewPlayerTeamId('');
+      setNewPlayerBatting('right');
+      setNewPlayerBowling('');
+      setEditingPlayer(null);
+      setModalType(null);
+      Alert.alert('Success', `${name} added successfully!`);
+    } catch (error) {
+      console.error('Error adding player:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? `Failed to add player: ${error.message}` : 'Failed to add player. Please try again.'
+      );
+    } finally {
+      setIsSavingPlayer(false);
+    }
   };
 
   const handleAddTeam = async () => {
@@ -518,10 +530,11 @@ export default function TeamsScreen() {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
+              style={[styles.button, styles.submitButton, isSavingPlayer && styles.disabledButton]}
               onPress={handleAddPlayer}
+              disabled={isSavingPlayer}
             >
-              <Text style={styles.submitButtonText}>Add Player</Text>
+              <Text style={styles.submitButtonText}>{isSavingPlayer ? 'Adding...' : 'Add Player'}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -1083,6 +1096,9 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: Colors.primary,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   submitButtonText: {
     fontSize: 16,

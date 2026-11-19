@@ -42,6 +42,7 @@ export interface PlayerStats {
   stumpings: number;
   highestScore: number;
   bestBowling: string;
+  bestBowlingWickets?: number;
   fifties: number;
   centuries: number;
   average: number;

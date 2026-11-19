@@ -38,10 +38,10 @@ export default function LoginScreen() {
         setPassword('');
         setFullName('');
       } else {
-        await runWithGlobalLoading(() => signIn(email.trim(), password.trim()), 'Signing in...');
+        await runWithGlobalLoading(() => signIn(email.trim().toLocaleLowerCase(), password.trim()), 'Signing in...');
 
         // Fetch user role from profile
-        const userRole = await runWithGlobalLoading(() => getUserRole(email.trim()), 'Loading profile...');
+        const userRole = await runWithGlobalLoading(() => getUserRole(email.trim().toLocaleLowerCase()), 'Loading profile...');
 
         if (!userRole) {
           Alert.alert('Error', 'Unable to load user role. Please try again.');
@@ -49,7 +49,7 @@ export default function LoginScreen() {
         }
 
         // Set role in app context and wait for it to persist before navigating
-        await setRole(userRole, email.split('@')[0]);
+        await setRole(userRole, email.trim().toLocaleLowerCase().split('@')[0]);
         router.replace('/');
       }
     } catch (error: any) {
