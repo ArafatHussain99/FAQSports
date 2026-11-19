@@ -119,5 +119,4 @@ Code for each sport lives in its own folder under `sports/` (`cricket/`, `footba
 - **Inconsistent "Coming soon" labels:** the More tab marks Football and Table Tennis as "Coming soon", but they can be selected on Home and have create screens.
 - **Unfinished menu items:** Tournaments, Leaderboards, FAQ and Terms of Service are not wired up yet. Tournaments already has a data type.
 - **Placeholder support email:** Contact Support uses `support@company.com`.
-- **Secrets in logs:** `api/supabaseClient.ts` logs the Supabase URL and anon key to the console.
 - **Tests:** there is only one test (home screen), and it currently cannot run: Jest's `transformIgnorePatterns` doesn't include `@nkzw/create-context-hook`, and the Supabase env vars aren't set for tests. The scoring engines would benefit most from unit tests.

@@ -42,14 +42,16 @@ Do **not** run `npm run reset-project` — it moves the `app/` directory out and
 
 ## 4. Environment
 
-Supabase credentials come from Expo public env vars (in `.env`, which is git-ignored):
+Supabase project ID: `gflkukmbxjiggvobvitb` (URL `https://gflkukmbxjiggvobvitb.supabase.co`). `api/supabaseClient.ts` uses this URL by default.
+
+The client key comes from an Expo public env var in `.env` (git-ignored) at the project root. Copy `.env.example` to start:
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=...
-EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Supabase → Project Settings → API Keys
+EXPO_PUBLIC_SUPABASE_URL=...                              # optional, overrides the default project URL
 ```
 
-Never commit `.env` or hard-code keys. Note: `api/supabaseClient.ts` currently `console.log`s both values — don't add more logging of secrets.
+The legacy `EXPO_PUBLIC_SUPABASE_ANON_KEY` (JWT) is still read as a fallback while Supabase phases it out. Never commit `.env`, never hard-code or log the key, and never put a secret/service_role key in the app. `supabaseClient.ts` throws a clear error if no key is set. Expo inlines `EXPO_PUBLIC_*` values at bundle time, so restart with `npx expo start -c` after changing `.env`. Git worktrees under `.claude/worktrees/` don't have the `.env`; run the app from the main checkout.
 
 ## 5. Project Structure
 
