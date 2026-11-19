@@ -4,12 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { X, RotateCcw, ArrowLeftRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useMatches, useData } from '@/context/AppContext';
-import { BallEvent, CricketMatch } from '@/types';
+import { useData } from '@/context/AppContext';
+import { useCricketMatches } from '../context';
+import { BallEvent, CricketMatch } from '../types';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { handleScore as scoreEngineHandleScore, handleExtra as scoreEngineHandleExtra, handleUndo as scoreEngineHandleUndo } from './engines/scoreEngine';
-import { handleInningsEnd, selectNewBowler, swapStrike, handleEndMatch as inningsHandleEndMatch } from './engines/inningsEngine';
-import { handleWicket } from './engines/wicketEngine';
+import { handleScore as scoreEngineHandleScore, handleExtra as scoreEngineHandleExtra, handleUndo as scoreEngineHandleUndo } from '../engines/scoreEngine';
+import { handleInningsEnd, selectNewBowler, swapStrike, handleEndMatch as inningsHandleEndMatch } from '../engines/inningsEngine';
+import { handleWicket } from '../engines/wicketEngine';
 
 const runButtons = [
   { value: 0, label: '0', color: Colors.border },
@@ -29,7 +30,7 @@ const extraButtons = [
 
 export default function LiveScoringScreen() {
   const router = useRouter();
-  const { currentMatch, updateLiveMatch, endMatch, setLiveMatch } = useMatches();
+  const { currentMatch, updateLiveMatch, endMatch, setLiveMatch } = useCricketMatches();
   const { getPlayerById, getTeamById } = useData();
   const [lastBalls, setLastBalls] = useState<BallEvent[]>([]);
   const { showActionSheetWithOptions } = useActionSheet();

@@ -4,20 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useData, useMatches } from '@/context/AppContext';
-import { CricketMatch, CricketMatchType, TossDecision, Substitute } from '@/types';
+import { useData } from '@/context/AppContext';
+import { matchTypes } from '../constants';
+import { useCricketMatches } from '../context';
+import { CricketMatch, CricketMatchType, TossDecision, Substitute } from '../types';
 
 type Step = 'basics' | 'teams' | 'toss' | 'players';
-
-export const matchTypes: { key: CricketMatchType; label: string }[] = [
-  { key: 'long', label: 'Long Pitch' },
-  { key: 'short', label: 'Short Pitch' },
-];
 
 export default function CreateMatchScreen() {
   const router = useRouter();
   const { teams, players, getTeamPlayers, getTeamById, grounds } = useData();
-  const { setUpcomingMatches, setCurrentMatch } = useMatches();
+  const { setUpcomingMatches, setCurrentMatch } = useCricketMatches();
 
   const [step, setStep] = useState<Step>('basics');
   const [matchType, setMatchType] = useState<CricketMatchType>('long');
@@ -169,7 +166,7 @@ export default function CreateMatchScreen() {
             }
 
             setCurrentMatch({ ...updatedMatch, status: 'live', startedAt: new Date().toISOString() });
-            router.replace('/match/live-scoring');
+            router.replace('/cricket/live-scoring');
           },
         },
       ]

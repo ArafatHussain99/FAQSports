@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert 
 import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useData, useFootballMatches } from '@/context/AppContext';
-import { FootballMatch, FootballMatchFormat } from '@/types';
+import { useData } from '@/context/AppContext';
+import { useFootballMatches } from '../context';
+import { FootballMatch, FootballMatchFormat } from '../types';
 import { grounds } from '@/mocks/data';
 
 type Step = 'basics' | 'teams' | 'players';

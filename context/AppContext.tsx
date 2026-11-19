@@ -1,6 +1,8 @@
-import { getGrounds, getPlayers, getTeams } from '@/app/api/matchesApi';
-import { mockCompletedMatches, mockLiveMatch, mockNotifications, mockPlayers, mockTeams, mockUpcomingMatches } from '@/mocks/data';
-import { CricketMatch, FootballMatch, Notification, Player, SportType, Team, UserRole } from '@/types';
+import { getGrounds } from '@/api/groundApi';
+import { getPlayers } from '@/api/playerApi';
+import { getTeams } from '@/api/teamApi';
+import { mockNotifications, mockPlayers, mockTeams } from '@/mocks/data';
+import { Notification, Player, SportType, Team, UserRole } from '@/types';
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -121,96 +123,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     globalLoadingMessage,
     setGlobalLoading,
     runWithGlobalLoading,
-  };
-});
-
-export const [MatchProvider, useMatches] = createContextHook(() => {
-  const [liveMatch, setLiveMatch] = useState<CricketMatch | null>(mockLiveMatch);
-  const [upcomingMatches, setUpcomingMatches] = useState<CricketMatch[]>(mockUpcomingMatches);
-  const [completedMatches, setCompletedMatches] = useState<CricketMatch[]>(mockCompletedMatches);
-  const [currentMatch, setCurrentMatch] = useState<CricketMatch | null>(null);
-
-  const startMatch = useCallback((match: CricketMatch) => {
-    const updatedMatch = { ...match, status: 'live' as const, startedAt: new Date().toISOString() };
-    setLiveMatch(updatedMatch);
-    setCurrentMatch(updatedMatch);
-    setUpcomingMatches(prev => prev.filter(m => m.id !== match.id));
-  }, []);
-
-  const updateLiveMatch = useCallback((match: CricketMatch) => {
-    setLiveMatch(match);
-    setCurrentMatch(match);
-  }, []);
-
-  const endMatch = useCallback((match: CricketMatch, winner: string, result: string) => {
-    const completedMatch: CricketMatch = {
-      ...match,
-      status: 'completed',
-      winner,
-      result,
-      completedAt: new Date().toISOString(),
-    };
-    setCompletedMatches(prev => [completedMatch, ...prev]);
-    setLiveMatch(null);
-    setCurrentMatch(null);
-  }, []);
-
-  return {
-    liveMatch,
-    upcomingMatches,
-    completedMatches,
-    currentMatch,
-    setCurrentMatch,
-    startMatch,
-    updateLiveMatch,
-    endMatch,
-    setLiveMatch,
-    setUpcomingMatches,
-  };
-});
-
-export const [FootballMatchProvider, useFootballMatches] = createContextHook(() => {
-  const [liveMatch, setLiveMatch] = useState<FootballMatch | null>(null);
-  const [upcomingMatches, setUpcomingMatches] = useState<FootballMatch[]>([]);
-  const [completedMatches, setCompletedMatches] = useState<FootballMatch[]>([]);
-  const [currentMatch, setCurrentMatch] = useState<FootballMatch | null>(null);
-
-  const startMatch = useCallback((match: FootballMatch) => {
-    const updatedMatch = { ...match, status: 'live' as const, startedAt: new Date().toISOString() };
-    setLiveMatch(updatedMatch);
-    setCurrentMatch(updatedMatch);
-    setUpcomingMatches(prev => prev.filter(m => m.id !== match.id));
-  }, []);
-
-  const updateLiveMatch = useCallback((match: FootballMatch) => {
-    setLiveMatch(match);
-    setCurrentMatch(match);
-  }, []);
-
-  const endMatch = useCallback((match: FootballMatch, winner: string, result: string) => {
-    const completedMatch: FootballMatch = {
-      ...match,
-      status: 'completed',
-      winner,
-      result,
-      completedAt: new Date().toISOString(),
-    };
-    setCompletedMatches(prev => [completedMatch, ...prev]);
-    setLiveMatch(null);
-    setCurrentMatch(null);
-  }, []);
-
-  return {
-    liveMatch,
-    upcomingMatches,
-    completedMatches,
-    currentMatch,
-    setCurrentMatch,
-    startMatch,
-    updateLiveMatch,
-    endMatch,
-    setLiveMatch,
-    setUpcomingMatches,
   };
 });
 

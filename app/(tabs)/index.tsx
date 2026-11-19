@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Plus, WifiOff, ChevronRight, Trophy, Users, TrendingUp } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useApp, useMatches, useFootballMatches, useData } from '@/context/AppContext';
-import { CricketMatch } from '@/types';
-import LiveMatchCard from '@/components/LiveMatchCard';
-import MatchCard from '@/components/MatchCard';
+import { useApp, useData } from '@/context/AppContext';
+import { useCricketMatches } from '@/sports/cricket/context';
+import { useFootballMatches } from '@/sports/football/context';
+import { CricketMatch } from '@/sports/cricket/types';
+import LiveMatchCard from '@/sports/cricket/components/LiveMatchCard';
+import MatchCard from '@/sports/cricket/components/MatchCard';
 
 const sportIcons = [
   { id: 'cricket', name: 'Cricket', emoji: '🏏', color: Colors.cricket },
@@ -21,7 +23,7 @@ const sportIcons = [
 export default function HomeScreen() {
   const router = useRouter();
   const { role, userName, isAdmin, isOnline, isInitialized, currentSport, setCurrentSport } = useApp();
-  const { liveMatch, upcomingMatches, completedMatches } = useMatches();
+  const { liveMatch, upcomingMatches, completedMatches } = useCricketMatches();
   const { liveMatch: liveFootballMatch, upcomingMatches: upcomingFootballMatches, completedMatches: completedFootballMatches } = useFootballMatches();
   const { unreadCount, players, teams } = useData();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -164,11 +166,11 @@ export default function HomeScreen() {
             style={styles.createMatchBtn}
             onPress={() => {
               if (currentSport === 'cricket') {
-                router.push('/create-match');
+                router.push('/cricket/create-match');
               } else if (currentSport === 'football') {
-                router.push('/create-football-match' as any);
+                router.push('/football/create-match');
               } else if (currentSport === 'table_tennis') {
-                router.push('/create-table-tennis-match' as any);
+                router.push('/table-tennis/create-match');
               }
             }}
             activeOpacity={0.8}

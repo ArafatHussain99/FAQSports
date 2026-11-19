@@ -120,7 +120,7 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Admin Actions</Text>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => router.push('/create-match')}
+              onPress={() => router.push('/cricket/create-match')}
             >
               <View style={[styles.menuIcon, { backgroundColor: `${Colors.primary}20` }]}>
                 <Trophy size={20} color={Colors.primary} />

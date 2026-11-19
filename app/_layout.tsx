@@ -1,5 +1,7 @@
 import Colors from "@/constants/colors";
-import { AppProvider, DataProvider, FootballMatchProvider, MatchProvider, useApp } from "@/context/AppContext";
+import { AppProvider, DataProvider, useApp } from "@/context/AppContext";
+import { CricketMatchProvider } from "@/sports/cricket/context";
+import { FootballMatchProvider } from "@/sports/football/context";
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
@@ -24,14 +26,20 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-      <Stack.Screen name="match/(live_scoring)/live-scoring" options={{ headerShown: false, gestureEnabled: false }} />
-      <Stack.Screen name="match/[id]" options={{ title: 'Match Details' }} />
       <Stack.Screen name="player/[id]" options={{ title: 'Player Profile' }} />
       <Stack.Screen name="team/[id]" options={{ title: 'Team Details' }} />
-      <Stack.Screen name="create-match" options={{ title: 'Create Match', presentation: 'modal' }} />
-      <Stack.Screen name="create-football-match" options={{ title: 'Create Football Match', presentation: 'modal' }} />
-      <Stack.Screen name="create-table-tennis-match" options={{ title: 'Create Table Tennis Match', presentation: 'modal' }} />
       <Stack.Screen name="manage-stadiums" options={{ title: 'Manage Stadiums' }} />
+
+      {/* Cricket */}
+      <Stack.Screen name="cricket/create-match" options={{ title: 'Create Match', presentation: 'modal' }} />
+      <Stack.Screen name="cricket/live-scoring" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="cricket/match/[id]" options={{ title: 'Match Details' }} />
+
+      {/* Football */}
+      <Stack.Screen name="football/create-match" options={{ title: 'Create Football Match', presentation: 'modal' }} />
+
+      {/* Table Tennis */}
+      <Stack.Screen name="table-tennis/create-match" options={{ title: 'Create Table Tennis Match', presentation: 'modal' }} />
       <Stack.Screen name="notification" options={{ title: 'Notifications' }} />
     </Stack>
   );
@@ -64,7 +72,7 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AppProvider>
           <DataProvider>
-            <MatchProvider>
+            <CricketMatchProvider>
               <FootballMatchProvider>
                 <ActionSheetProvider>
                   <View style={{ flex: 1 }}>
@@ -73,7 +81,7 @@ export default function RootLayout() {
                   </View>
                 </ActionSheetProvider>
               </FootballMatchProvider>
-            </MatchProvider>
+            </CricketMatchProvider>
           </DataProvider>
         </AppProvider>
       </GestureHandlerRootView>

@@ -1,4 +1,4 @@
-import { getUserRole, signIn, signUp } from '@/app/api/matchesApi';
+import { getUserRole, signIn, signUp } from '@/api/authApi';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { useRouter } from 'expo-router';

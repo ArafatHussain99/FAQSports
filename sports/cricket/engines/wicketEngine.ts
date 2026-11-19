@@ -1,4 +1,5 @@
-import { BatsmanScore, CricketMatch, Player, TypeDismissalType } from '@/types';
+import { Player } from '@/types';
+import { BatsmanScore, CricketMatch, TypeDismissalType } from '../types';
 
 export interface WicketEngineParams {
   currentMatch: CricketMatch | null;

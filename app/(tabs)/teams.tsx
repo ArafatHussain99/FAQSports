@@ -20,8 +20,8 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { deletePlayerInfo, uploadPlayerInfo, uploadPlayerStats } from '../api/playerApi';
-import { deleteTeamInfo, uploadTeamInfo } from '../api/teamApi';
+import { deletePlayerInfo, uploadPlayerInfo, uploadPlayerStats } from '@/api/playerApi';
+import { deleteTeamInfo, uploadTeamInfo } from '@/api/teamApi';
 
 type TabType = 'teams' | 'players';
 type ModalType = 'addPlayer' | 'editPlayerTeam' | 'addTeam' | null;

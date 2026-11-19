@@ -5,7 +5,7 @@ import { useRouter, Stack } from 'expo-router';
 import { Check, X, Plus, Trash2 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useData } from '@/context/AppContext';
-import { addGround, getGrounds } from '@/app/api/matchesApi';
+import { addGround, getGrounds } from '@/api/groundApi';
 
 export default function ManageStadiumsScreen() {
   const router = useRouter();
