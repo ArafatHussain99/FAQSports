@@ -12,7 +12,7 @@ Guidance for Claude Code when working in this repository.
 - **Target users:** Employees of FAQ.
 - **Current status:** Existing application under active development.
 
-Read `docs/PROJECT_OVERVIEW.md` for details (if present).
+Read `docs/PROJECT_OVERVIEW.md` for details: roles, screens, sport status, cricket scoring rules, data model and known gaps.
 
 ## 2. Technology Stack
 
