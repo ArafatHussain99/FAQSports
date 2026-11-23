@@ -67,6 +67,23 @@ The client is created with default options: no `auth.storage`, so see [AUTHENTIC
 | `getMatches()` | `sports/cricket/api.ts` | `matches` select | raw rows | **never** | Runs; logs `row.name`, which doesn't exist |
 | `uploadBallInfo(ball)` | `sports/cricket/api.ts` | `ball_info` insert | `void` | **never** | **No: table doesn't exist** (D2) |
 
+### Tournaments (`tournaments/api.ts`)
+
+Needs migration `20261128000000`. Writes are admin-only (RLS); updates and deletes check rows came back and throw `42501` otherwise.
+
+| Function | Does |
+|----------|------|
+| `getTournaments()` | All tournaments with entries (`tournament_teams`) and matches (`tournament_matches`) embedded, newest first. Used by `useTournaments()` (`['tournaments']`) |
+| `createTournament(input)` | RPC `create_tournament`: tournament + entries + round-robin league fixtures in one transaction. Returns the id |
+| `saveMatchResult(matchId, result)` / `clearMatchResult(matchId)` | Set or clear a match result |
+| `createKnockoutMatches(tournamentId, stage, pairs)` | Semi-finals / final |
+| `setTieBreakRanks(ranks)` | Admin order for teams level on every tie-breaker |
+| `renameEntry(entryId, name)` | Rename a table tennis team |
+| `finishTournament(id, winnerEntryId)` | `status 'completed'`, winner, end date (archives it) |
+| `deleteTournament(id)` | Deletes it with entries and matches |
+
+`api/statsApi.ts` also has `getMatchStatsForYear(year)`: `player_match_stats` rows played in that calendar year (Leaderboards).
+
 ## 4. Request examples
 
 Each example shows the app call, then the HTTP request supabase-js sends. `$KEY` is the publishable key and `$JWT` the signed-in user's access token (without a session, supabase-js sends the publishable key as the bearer). Every REST request carries:
@@ -384,7 +401,6 @@ Show a specific message for at least `23505`, `23503` and `42501`, and treat a 0
 | `player_ratings` | Real ratings on player profiles |
 | `player_performances` | "Last five performances" |
 | `notifications` | Replacing mock notifications |
-| `tournaments`, `tournament_teams` | Tournaments menu item |
 | `matches`, `match_squads`, `innings`, `innings_extras`, `batting_scorecards`, `bowling_scorecards`, `fall_of_wickets`, `ball_events` | Saving cricket matches and live scoring |
 
 Also missing: update functions for teams, players, stats and grounds; delete for grounds; stats updates after a match. Most of these also need RLS policies that don't exist yet, and no current policy checks the admin role ([DATABASE_SCHEMA.md §7.3](DATABASE_SCHEMA.md#73-row-level-security-policies)).

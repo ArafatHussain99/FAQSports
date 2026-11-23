@@ -64,7 +64,8 @@ Shared features:
 | Grounds: delete | Local only; comes back on reload |
 | Player profile: ratings, last five, comments | Ratings fixed at 50, last five empty, comments not saved |
 | Notifications | Mock data only |
-| Tournaments, Leaderboards, FAQ, Terms | Menu items with no action |
+| Tournaments | Implemented (results entered by hand); needs migration `20261128000000` |
+| Leaderboards, FAQ, Terms | Implemented |
 | Sport switcher | Implemented; changes the "top players" stat on Home |
 
 ## 4. What is and isn't persisted

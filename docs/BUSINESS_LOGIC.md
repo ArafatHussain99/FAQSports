@@ -350,3 +350,15 @@ Not implemented. Home shows a "Coming Soon" alert.
 | Table Tennis, Badminton, Carrom, UNO | wins |
 
 - **Team details:** top run scorer, wicket taker and catcher within the squad.
+
+## 9. Tournaments
+
+Code: `tournaments/standings.ts` (pure, tested in `__tests__/tournament-standings-test.ts`). Rules recorded in [REQUIREMENTS.md §7](REQUIREMENTS.md#7-open-questions) Q23–24.
+
+- **Format:** single round robin (circle method) for the league, then optionally a final (1st v 2nd) or semi-finals (1st v 4th, 2nd v 3rd) and a final. An admin creates each knockout stage once the previous one is complete, and finishes the tournament once the final (or, league only, the last league match) has a result. Finished = `status 'completed'` = archived.
+- **Results:** entered by an admin. Cricket: runs, wickets and overs for each side, or "no result". Football: goals. Table tennis: games won (no draws). Level knockout scores need a super over / penalty winner.
+- **Points:** cricket win 2, tie 1, no result 1 · football win 3, draw 1 · table tennis win 3.
+- **Order:** cricket points → net run rate → head-to-head · football points → goal difference → head-to-head → goals scored · table tennis points → head-to-head → game difference. Head-to-head is a mini-league of the matches between the level teams only.
+- **Net run rate (ICC):** (runs scored ÷ overs faced) − (runs conceded ÷ overs bowled) over league matches, overs as balls ÷ 6. A side all out (players per side − 1 wickets) counts as facing its full quota. No-result matches are left out.
+- **Unbreakable ties:** teams still level get `tie_break_rank` from an admin. The app asks (pop-up, works on web) only when the tie straddles the knockout cut-off, or decides the champion of a league-only tournament. Picked teams are ranked in pick order, the rest after them.
+- **Locks:** league results can't change once knockouts exist; semi-finals once the final exists; nothing once finished.

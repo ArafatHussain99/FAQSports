@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  Trophy, Users, Bell, BarChart3, FileText,
-  HelpCircle, Mail, ChevronRight, Gamepad2, LucideIcon, MapPin
+  Award, Trophy, Bell, BarChart3, FileText,
+  HelpCircle, Mail, ChevronRight, LucideIcon, MapPin
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
+import { SUPPORT_EMAIL, supportMailto } from '@/constants/support';
 
 interface MenuItem {
   icon: LucideIcon;
@@ -31,40 +32,29 @@ export default function MoreScreen() {
 
   const menuSections: MenuSection[] = [
     {
-      title: 'Sports',
-      items: [
-        { icon: Gamepad2, label: 'Cricket', subtitle: 'Matches, stats, rankings', onPress: () => router.push('/matches') },
-        { icon: Gamepad2, label: 'Football', subtitle: 'Coming soon', disabled: true },
-        { icon: Gamepad2, label: 'Table Tennis', subtitle: 'Coming soon', disabled: true },
-        { icon: Gamepad2, label: 'Badminton', subtitle: 'Coming soon', disabled: true },
-      ],
-    },
-    {
       title: 'Features',
       items: [
-        { icon: Trophy, label: 'Tournaments', subtitle: 'View all tournaments', onPress: () => { } },
-        { icon: BarChart3, label: 'Leaderboards', subtitle: 'Top performers', onPress: () => { } },
-        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', badge: unreadCount, onPress: () => router.push('../notification') },
+        { icon: Trophy, label: 'Tournaments', subtitle: 'Ongoing and archived tournaments', onPress: () => router.push('/tournaments') },
+        { icon: BarChart3, label: 'Leaderboards', subtitle: 'Top performers of the year', onPress: () => router.push('/leaderboards') },
+        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', badge: unreadCount, onPress: () => router.push('/notification') },
       ],
     },
     {
       title: 'Help and support',
       items: [
-        { icon: HelpCircle, label: 'FAQ', subtitle: 'Common questions', onPress: () => { } },
-        { icon: Mail, label: 'Contact Support', subtitle: 'Get help', onPress: () => Linking.openURL('mailto:support@company.com') },
-        { icon: FileText, label: 'Terms of Service', subtitle: 'Read our terms', onPress: () => { } },
+        { icon: HelpCircle, label: 'FAQ', subtitle: 'Common questions', onPress: () => router.push('/faq') },
+        { icon: Mail, label: 'Contact Support', subtitle: SUPPORT_EMAIL, onPress: () => Linking.openURL(supportMailto()) },
+        { icon: FileText, label: 'Terms of Service', subtitle: 'Read our terms', onPress: () => router.push('/terms') },
       ],
     },
   ];
 
   if (isAdmin) {
-    menuSections.splice(1, 0, {
+    menuSections.unshift({
       title: 'Admin tools',
       items: [
-        { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', onPress: () => router.push('/cricket/create-match') },
-        { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', onPress: () => router.push('/teams') },
         { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', onPress: () => router.push('/manage-stadiums') },
-        { icon: Trophy, label: 'Champions', subtitle: 'Set winners and runners-up', onPress: () => router.push('/manage-awards') },
+        { icon: Award, label: 'Champions', subtitle: 'Set winners and runners-up', onPress: () => router.push('/manage-awards') },
       ],
     });
   }

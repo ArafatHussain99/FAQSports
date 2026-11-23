@@ -21,7 +21,7 @@ Related: [API_DOCUMENTATION.md](API_DOCUMENTATION.md) · [AUTHENTICATION.md](AUT
 | | `player_ratings` | No (app hard-codes 50) |
 | | `player_performances` | No (app returns `[]`) |
 | Venues | `grounds` | Read names, insert |
-| Tournaments | `tournaments`, `tournament_teams` | No |
+| Tournaments | `tournaments`, `tournament_teams`, `tournament_matches` (migration `20261128000000`, **not applied yet**) | Read, create (RPC `create_tournament`), update results, delete. Read: everyone; writes: admins (`is_admin()`) |
 | Matches | `matches`, `match_squads` | No (`getMatches` exists, never called) |
 | Cricket scoring | `innings`, `innings_extras`, `batting_scorecards`, `bowling_scorecards`, `fall_of_wickets`, `ball_events` | No |
 | Table tennis | `table_tennis_matches` (added by `supabase/migrations/20261123000000_table_tennis_matches.sql`) | Read, insert, update, delete. One row per match; `points` and `game_setups` are JSONB. Select for signed-in users; writes for admins only |
@@ -159,6 +159,16 @@ Migration `20261124000000`. Unique `(sport, match_id, player_id)`; `sport` is `c
 
 Migration `20261124000000`. Current champion (`place` 1) and runner-up (`place` 2) per sport, to a team or a player. Recipients are the players recognised, snapshotted when the award is set. Migration `20261126000000` (**not applied yet**) adds `category`: `main` for cricket and football, `singles` / `doubles` for table tennis (a doubles award has two recipients); the key becomes `(sport, category, place)`. Read: everyone. Write: `set_sport_award()` / `clear_sport_award()` (admins).
 
+### `tournaments`, `tournament_teams`, `tournament_matches`
+
+Migration `20261128000000` (**not applied yet**).
+
+- `tournaments` gains `format` (`single`/`double`, table tennis only), `overs_per_innings` and `players_per_side` (cricket only), `qualifiers` (0, 2 or 4), `winner_entry_id` → `tournament_teams` (`SET NULL`), `created_by`; `sport` limited to `cricket`, `football`, `table_tennis`. Status: `live` while running, `completed` when archived.
+- `tournament_teams` (an "entry"): `team_id` becomes optional; new `name`, `player_ids uuid[]` (table tennis), `seed`, `tie_break_rank`. Deleting a tournament now cascades to its entries.
+- `tournament_matches` (new): `stage` (`league`/`semi`/`final`), `round`, `entry_a_id`/`entry_b_id` → `tournament_teams` (cascade), `status` (`upcoming`/`completed`), `score_a`/`score_b` (runs, goals or games), cricket `wickets_*`/`balls_*`, `outcome` (`A`, `B`, `draw`, `no_result`; knockouts only `A`/`B`).
+- `create_tournament(name, sport, format, overs, players_per_side, qualifiers, entries jsonb, fixtures jsonb)` creates all three in one transaction; admins only.
+- RLS: read for everyone, all writes `is_admin()`.
+
 ### `player_ratings` (one row per player)
 
 `player_id` (unique) → `players`; `batting`, `bowling`, `fielding`, `overall` integers, default **0**. The app doesn't create or read this row and shows 50 for everything.
@@ -260,7 +270,7 @@ These affect the app **today** or block the next steps. Each needs a code change
 | D13 | `teams.name` and `grounds.name` are unique | Duplicates fail with a generic "Failed to add" | Code: show a "name already exists" message |
 | D14 | `matches.match_type` default `'short'`, app default `'long'` | Only matters if the app omits it | Pick one default |
 | D15 | `match_status` has `abandoned`; the app's `MatchStatus` has `cancelled` | Saving a cancelled match would fail | Code or schema: use one word (decision) |
-| D16 | `tournament_status` has `live`; the app's `Tournament.status` has `ongoing` | Tournaments would fail to save | Code: use `live` |
+| D16 | `tournament_status` has `live`; the old unused `Tournament` type in `types/index.ts` has `ongoing` | None: the tournaments code (`tournaments/types.ts`) uses `live` | Delete the old type |
 | D17 | `dismissal_type` has `lbw`; the app's `TypeDismissalType` and menu don't | LBW can't be recorded | **Decision:** add LBW to the app, or drop it from the enum |
 | D18 | Writes the app does need policies that don't exist (§7.3): `players`, `player_stats`, grounds delete, all match tables | Those writes are rejected if RLS is on for the table | **RLS:** admin write policies |
 
@@ -312,7 +322,7 @@ What this means:
 | `players` | everyone | — | admins (`20261119000100`) | admins — migration `20261125000000`, **not applied yet** |
 | `player_stats`, `player_ratings` | everyone | — | — | — (rows go with the player through cascades) |
 | `matches`, `match_squads`, `innings`, `innings_extras`, `batting_scorecards`, `bowling_scorecards`, `fall_of_wickets`, `ball_events` | everyone | — | — | — |
-| `tournaments`, `tournament_teams` | everyone | — | — | — |
+| `tournaments`, `tournament_teams`, `tournament_matches` | everyone | admins | admins | admins — migration `20261128000000`, **not applied yet** |
 | `player_performances` | no policy | — | — | — |
 
 "—" means no policy. If RLS is on for that table, the operation is denied: inserts fail with error `42501`; updates and deletes don't error, they just affect 0 rows. Whether RLS is on for each table is **Unknown** (§8).

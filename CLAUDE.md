@@ -67,6 +67,7 @@ npx jest <file>             # one test file
 ```
 app/                 Expo Router routes ONLY (thin re-exports for sport screens)
 sports/<sport>/      screens/ components/ engines/ api.ts context.tsx types.ts constants.ts
+tournaments/         all-sport tournaments: screens/ components/ api.ts hooks.ts standings.ts types.ts
 api/                 shared Supabase access (auth, teams, players, grounds)
 context/AppContext.tsx   useApp (role, sport, global loading), useData (players, teams, grounds)
 types/               shared types; constants/colors.tsx  colour tokens

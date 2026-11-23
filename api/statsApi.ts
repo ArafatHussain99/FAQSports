@@ -113,6 +113,22 @@ export const getTeamMatchStats = async (teamId: string): Promise<PlayerMatchStat
   return (data ?? []) as PlayerMatchStatRow[];
 };
 
+/** Every match line played in one calendar year (local time), for yearly leaderboards. */
+export const getMatchStatsForYear = async (year: number): Promise<PlayerMatchStatRow[]> => {
+  const from = new Date(year, 0, 1).toISOString();
+  const to = new Date(year + 1, 0, 1).toISOString();
+  const { data, error } = await supabase
+    .from('player_match_stats')
+    .select(SELECT_COLUMNS)
+    .gte('played_at', from)
+    .lt('played_at', to);
+  if (error) {
+    console.error("Error fetching yearly match stats:", error);
+    throw error;
+  }
+  return (data ?? []) as PlayerMatchStatRow[];
+};
+
 /** Groups a player's match lines by team (and sport), most recent team first. */
 export const groupByTeam = (rows: PlayerMatchStatRow[]): TeamSpell[] => {
   const spells = new Map<string, TeamSpell>();

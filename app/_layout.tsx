@@ -36,6 +36,14 @@ function RootLayoutNav() {
       <Stack.Screen name="team/[id]" options={{ title: 'Team Details' }} />
       <Stack.Screen name="manage-stadiums" options={{ title: 'Manage Stadiums' }} />
       <Stack.Screen name="manage-awards" options={{ title: 'Champions' }} />
+      <Stack.Screen name="leaderboards" options={{ title: 'Leaderboards' }} />
+      <Stack.Screen name="faq" options={{ title: 'FAQ' }} />
+      <Stack.Screen name="terms" options={{ title: 'Terms of Service' }} />
+
+      {/* Tournaments (all sports) */}
+      <Stack.Screen name="tournaments/index" options={{ title: 'Tournaments' }} />
+      <Stack.Screen name="tournaments/create" options={{ title: 'New Tournament', presentation: 'modal' }} />
+      <Stack.Screen name="tournaments/[id]" options={{ title: 'Tournament' }} />
 
       {/* Cricket */}
       <Stack.Screen name="cricket/create-match" options={{ title: 'Create Match', presentation: 'modal' }} />

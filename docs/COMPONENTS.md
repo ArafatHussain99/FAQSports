@@ -172,7 +172,7 @@ Suggested home: a new top-level `components/` folder for shared UI (CLAUDE.md do
 | Matches | `app/(tabs)/matches.tsx` | — | `useApp`, `useCricketMatches` | Filter chips; `+` opens cricket create |
 | Teams | `app/(tabs)/teams.tsx` | — | `useApp`, `useData` | Teams/Players tabs with a Cricket/Football switch, 3 modals (Add team picks the sport; Add player picks a cricket and a football team; Change Team saves the selected sport's team via `updatePlayerTeam`), `SwipeableCard` (height follows content) |
 | Profile | `app/(tabs)/profile.tsx` | — | `useApp`, `useData` | Own stats (guessed), logout |
-| More | `app/(tabs)/more.tsx` | — | `useApp`, `useData` | Menu sections |
+| More | `app/(tabs)/more.tsx` | — | `useApp`, `useData` | Admin tools (Stadiums, Champions), Features (Tournaments, Leaderboards, Notifications), Help (FAQ, Contact Support mail, Terms) |
 | Login | `app/login.tsx` | — | `useApp` | Sign in / sign up |
 | Player profile | `app/player/[id].tsx` | `id` | `useData`, `useApp` | Cover picture + nickname (admin Edit modal), stats, ratings, last five, comments |
 | Team details | `app/team/[id].tsx` | `id` | `useData` | Squad, captain, top performers |
@@ -184,6 +184,12 @@ Suggested home: a new top-level `components/` folder for shared UI (CLAUDE.md do
 | Football create | `sports/football/screens/CreateMatchScreen.tsx` | — | `useData`, `useFootballMatches` | 3-step wizard; grounds from mocks |
 | Table Tennis create | `sports/table-tennis/screens/CreateMatchScreen.tsx` | — | `useApp`, `useData`, `useTableTennisMatches` | 2-step wizard; grounds from Supabase (mock fallback); saves to `table_tennis_matches` |
 | Table Tennis scorecard | `sports/table-tennis/screens/ScorecardScreen.tsx` | `id` | `useApp`, `useData`, `useTableTennisMatches`, React Query | Setup, point-by-point scoring, undo, result; read-only for players |
+| Leaderboards | `app/leaderboards.tsx` | — | `useData`, React Query | Yearly top 5 per sport, year arrows |
+| FAQ / Terms | `app/faq.tsx`, `app/terms.tsx` | — | — | Static content; contact links use `constants/support.ts` |
+| Tournaments | `tournaments/screens/TournamentsScreen.tsx` | — | `useApp`, `useTournaments` | Sport filter, Ongoing, Archived |
+| Create tournament | `tournaments/screens/CreateTournamentScreen.tsx` | — | `useApp`, `useData`, `useTournaments` | Sport, TT singles/doubles, teams or players, knockout option |
+| Tournament | `tournaments/screens/TournamentDetailScreen.tsx` | `id` | `useApp`, `useTournaments`, `useEntryNames` | Matches / Table / Teams / Stats; admin `ResultModal`, `TieBreakModal` (both web-safe) |
+| `TournamentCard` | `tournaments/components/TournamentCard.tsx` | `tournament` | `useEntryNames` | Home and Tournaments list; leader or champion |
 | `TableTennisMatchCard` | `sports/table-tennis/components/TableTennisMatchCard.tsx` | `match` | `useData` | Home list card, opens the scorecard |
 
 ## 6. Cricket engines (non-UI modules)

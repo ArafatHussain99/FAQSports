@@ -23,6 +23,7 @@ flowchart LR
 app/                 Expo Router routes ONLY (every file is a URL)
   _layout.tsx        Root Stack, provider tree, global loading overlay
   (tabs)/            Home (index), matches, teams, profile, more
+  tournaments/       one-line re-exports of tournaments/screens/* (all-sport tournaments live in top-level tournaments/)
   login.tsx  manage-stadiums.tsx  notification.tsx
   player/[id].tsx  team/[id].tsx
   cricket/           one-line re-exports of sports/cricket/screens/*
@@ -115,6 +116,11 @@ flowchart TD
 | `/team/[id]` | `app/team/[id].tsx` | no | none |
 | `/manage-stadiums` | `app/manage-stadiums.tsx` | yes (link only shown to admins) | **none** |
 | `/notification` | `app/notification.tsx` | no | none |
+| `/leaderboards` | `app/leaderboards.tsx` | no | none |
+| `/faq`, `/terms` | `app/faq.tsx`, `app/terms.tsx` | no | none |
+| `/tournaments` | `tournaments/screens/TournamentsScreen.tsx` | New tournament button | none |
+| `/tournaments/create` | `tournaments/screens/CreateTournamentScreen.tsx` | yes | in screen ("Only admins") |
+| `/tournaments/[id]` | `tournaments/screens/TournamentDetailScreen.tsx` | result entry, knockouts, finish, rename, delete | RLS limits writes to admins |
 | `/cricket/create-match` | `sports/cricket/screens/CreateMatchScreen.tsx` | yes | **none** |
 | `/cricket/live-scoring` | `sports/cricket/screens/LiveScoringScreen.tsx` | yes | **none** |
 | `/cricket/match/[id]` | `sports/cricket/screens/MatchDetailsScreen.tsx` | Start/Continue scoring button | none |

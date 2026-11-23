@@ -101,8 +101,14 @@ Related: [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) · [BUSINESS_LOGIC.md](BUSIN
 | FR-HOME-1 | Home shows a welcome card with role badge, a sport switcher, the live match, upcoming and recent matches, and top 3 players for the selected sport's stat (runs, goals or wins). | Implemented (matches from mocks or memory) | `app/(tabs)/index.tsx` |
 | FR-MATCH-1 | Matches tab lists cricket matches filtered by all, live, upcoming, completed. | Implemented (cricket only, ignores the selected sport) | `app/(tabs)/matches.tsx` |
 | FR-NOTIF-1 | Users see notifications, can mark them read, and open the related match. | Partial (mock data) | `app/notification.tsx` |
-| FR-MORE-1 | Tournaments, Leaderboards, FAQ, Terms of Service. | Planned (empty handlers; `Tournament` type exists) | `app/(tabs)/more.tsx` |
-| FR-MORE-2 | Contact Support opens an email. | Implemented, placeholder address `support@company.com` | `more.tsx:54` |
+| FR-MORE-1 | More tab: Admin tools (Manage Stadiums, Champions; admins only), Features (Tournaments, Leaderboards, Notifications), Help and support (FAQ, Contact Support, Terms of Service). No Sports section; Manage Matches / Manage Teams removed (Home and the Teams tab cover them). | Implemented 2026-11-23 | `app/(tabs)/more.tsx` |
+| FR-MORE-2 | Contact Support opens an email to `arafat@faqi.com.au` (`constants/support.ts`). | Implemented | `constants/support.ts` |
+| FR-MORE-3 | FAQ screen (expandable questions) and Terms of Service screen. | Implemented | `app/faq.tsx`, `app/terms.tsx` |
+| FR-LEAD-1 | Leaderboards: top 5 players per sport for one calendar year (cricket runs/wickets/catches, football goals/assists/wins, table tennis wins/matches), from `player_match_stats`; arrows change the year. | Implemented | `app/leaderboards.tsx` |
+| FR-TOUR-1 | Admins create a cricket, football or table tennis (singles or doubles) tournament: name, number of teams, and League only / Final (top 2) / Semi-finals (top 4). Cricket/football teams are chosen from that sport's teams; table tennis teams are built from players and start as "Team 1, 2, ..." (renamable later). Every team plays every other once. | Implemented; needs migration `20261128000000` (**not applied**) | `tournaments/` |
+| FR-TOUR-2 | Ongoing tournaments of the selected sport show at the top of Home; tapping opens the tournament (matches upcoming/completed, table, teams, stats). | Implemented | `app/(tabs)/index.tsx`, `tournaments/screens/TournamentDetailScreen.tsx` |
+| FR-TOUR-3 | Admins enter each result by hand (cricket runs/wickets/overs, football goals, table tennis games). Table sorted by points then the sport's tie-breakers ([BUSINESS_LOGIC.md §9](BUSINESS_LOGIC.md#9-tournaments)). When teams are level on everything at the knockout cut-off (or for champion), a pop-up asks the admin who goes through. | Implemented | `tournaments/standings.ts` |
+| FR-TOUR-4 | Finished tournaments are archived: More -> Tournaments -> Archived shows champion, runner-up, table, results and stats. | Implemented | `tournaments/screens/TournamentsScreen.tsx` |
 | FR-AUDIT-1 | Admin actions are audit-logged. | Planned (`AuditLog` type only) | `types/index.ts` |
 
 ## 6. Non-functional requirements
@@ -148,6 +154,11 @@ These business rules can't be decided from the code. Answers should be recorded 
 20. **Cancelled vs abandoned:** the database calls it `abandoned`, the app `cancelled`. Which word?
 21. **Signed-out access:** most data is readable without signing in. Should it require sign-in?
 22. ~~**Cricket vs football teams**~~ — **Decided 2026-11-23:** teams belong to one sport (cricket or football). A player can be in one cricket team and one football team at the same time. All teams that existed before are cricket teams. The Teams tab has a Cricket / Football switch; match creation and awards only offer that sport's teams. Migration `20261127000000`.
+
+### Tournaments
+
+23. ~~**Tournament rules**~~ — **Decided 2026-11-23 (user):** any of cricket, football, table tennis (singles or doubles). Table sorted by points and net figure. Cricket uses net run rate per the ICC rule; football goal difference, then head-to-head; table tennis 3 points a win, then head-to-head. If three or more teams are level and it decides who goes through, an admin picks in a pop-up. Finished tournaments are archived with results and stats.
+24. **Assumed, please confirm:** cricket points win 2 / tie or no result 1; football draw 1 point and goals scored as the last tie-breaker; table tennis game difference after head-to-head; the league is a single round robin; knockouts are optional (final of top 2, or semi-finals 1v4, 2v3 then final); level knockout scores are settled by a super over / penalties winner the admin picks; results are entered by hand and don't update player stats or Champions; league results lock once knockouts start.
 
 ## 8. Undocumented assumptions found in code
 

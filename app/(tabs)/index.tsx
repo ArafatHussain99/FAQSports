@@ -13,6 +13,8 @@ import LiveMatchCard from '@/sports/cricket/components/LiveMatchCard';
 import MatchCard from '@/sports/cricket/components/MatchCard';
 import { useTableTennisMatches } from '@/sports/table-tennis/context';
 import TableTennisMatchCard from '@/sports/table-tennis/components/TableTennisMatchCard';
+import TournamentCard from '@/tournaments/components/TournamentCard';
+import { useTournaments } from '@/tournaments/hooks';
 
 const sports = [
   { id: 'cricket', name: 'Cricket', color: Colors.cricket },
@@ -32,6 +34,7 @@ export default function HomeScreen() {
   const { unreadCount, players, teams } = useData();
   const [refreshing, setRefreshing] = React.useState(false);
   const refetchTableTennis = tableTennis.refetch;
+  const { ongoing: ongoingTournaments, refetch: refetchTournaments } = useTournaments();
 
   useEffect(() => {
     if (isInitialized && !role) {
@@ -41,8 +44,8 @@ export default function HomeScreen() {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    refetchTableTennis().finally(() => setRefreshing(false));
-  }, [refetchTableTennis]);
+    Promise.allSettled([refetchTableTennis(), refetchTournaments()]).finally(() => setRefreshing(false));
+  }, [refetchTableTennis, refetchTournaments]);
 
   if (!isInitialized || !role) {
     return (
@@ -126,7 +129,7 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             style={styles.bellBtn}
-            onPress={() => router.push('../notification')}
+            onPress={() => router.push('/notification')}
             accessibilityRole="button"
             accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           >
@@ -181,6 +184,20 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
+        {ongoingTournaments.some(t => t.sport === currentSport) && (
+          <View>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitleInline}>Ongoing tournament{ongoingTournaments.filter(t => t.sport === currentSport).length > 1 ? 's' : ''}</Text>
+              <TouchableOpacity onPress={() => router.push('/tournaments')} hitSlop={12} accessibilityRole="link">
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            {ongoingTournaments
+              .filter(t => t.sport === currentSport)
+              .map(t => <TournamentCard key={t.id} tournament={t} />)}
+          </View>
+        )}
+
         {currentLiveMatch && currentSport === 'cricket' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Live now</Text>

@@ -17,7 +17,7 @@ Routes under `app/<sport>/` are one-line re-exports; edit the screen they point 
 | Matches | `app/(tabs)/matches.tsx` | Cricket only, ignores selected sport; fake refresh; no empty state for completed |
 | Teams & Players | `app/(tabs)/teams.tsx` | Team delete called twice, player delete hits wrong table, form cleared before save, `position` must be an enum value |
 | Profile | `app/(tabs)/profile.tsx` | Picks "my" player by name guess; Settings, Manage Players, Tournaments do nothing |
-| More | `app/(tabs)/more.tsx` | Several empty handlers; Football/TT marked "Coming soon" unlike Home |
+| More | `app/(tabs)/more.tsx` | — |
 | Login | `app/login.tsx` | Password trimmed; half-signed-in if role lookup fails |
 | Player profile | `app/player/[id].tsx` | Ratings fixed at 50, comments not saved, "not found" while loading |
 | Team details | `app/team/[id].tsx` | Sorts squad repeatedly per render; "not found" while loading |
