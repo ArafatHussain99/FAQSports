@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, Button, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, Button, TextInput, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { X, RotateCcw, ArrowLeftRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
@@ -33,7 +33,34 @@ export default function LiveScoringScreen() {
   const { currentMatch, updateLiveMatch, endMatch, setLiveMatch } = useCricketMatches();
   const { getPlayerById, getTeamById } = useData();
   const [lastBalls, setLastBalls] = useState<BallEvent[]>([]);
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { showActionSheetWithOptions: rawShowActionSheet } = useActionSheet();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
+  // On Android and web the action sheet (wicket type, new batsman, new bowler,
+  // extras...) is drawn in JS flush against the bottom of the screen, so its
+  // last options sat under the home indicator / navigation bar. Pad it by the
+  // bottom inset and cap its height below the status bar so long player lists
+  // scroll instead of running off the top. iOS uses the native sheet and
+  // ignores containerStyle.
+  const showActionSheetWithOptions = useCallback(
+    (config: any, callback: (index?: number) => void) => {
+      rawShowActionSheet(
+        {
+          ...config,
+          containerStyle: [
+            {
+              paddingBottom: insets.bottom,
+              maxHeight: windowHeight - insets.top - 24,
+            },
+            config?.containerStyle,
+          ],
+        },
+        callback
+      );
+    },
+    [rawShowActionSheet, insets.bottom, insets.top, windowHeight]
+  );
 
   const [showExtraRunsInput, setShowExtraRunsInput] = useState(false);
   const [extraType, setExtraType] = useState<'wide' | 'no_ball' | 'bye' | 'leg_bye' | null>(null);
