@@ -266,13 +266,19 @@ export default function TeamsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            deleteTeamInfo(team.id);
-            await runWithGlobalLoading(async () => {
-              deleteTeamInfo(team.id);
-
-              await Promise.all([refetchTeams(), refetchPlayers()]);
-            }, 'Deleting team...');
-            Alert.alert('Success', `Team ${team.name} deleted successfully!`);
+            try {
+              await runWithGlobalLoading(async () => {
+                await deleteTeamInfo(team.id);
+                await Promise.all([refetchTeams(), refetchPlayers()]);
+              }, 'Deleting team...');
+              Alert.alert('Success', `Team ${team.name} deleted successfully!`);
+            } catch (error) {
+              console.error('Error deleting team:', error);
+              Alert.alert(
+                'Error',
+                error instanceof Error ? `Failed to delete team: ${error.message}` : 'Failed to delete team. Please try again.'
+              );
+            }
           },
         },
       ]
@@ -288,9 +294,20 @@ export default function TeamsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            deletePlayerInfo(player.id);
-            Alert.alert('Success', `Player ${player.name} deleted successfully!`);
+          onPress: async () => {
+            try {
+              await runWithGlobalLoading(async () => {
+                await deletePlayerInfo(player.id);
+                await Promise.all([refetchPlayers(), refetchTeams()]);
+              }, 'Deleting player...');
+              Alert.alert('Success', `Player ${player.name} deleted successfully!`);
+            } catch (error) {
+              console.error('Error deleting player:', error);
+              Alert.alert(
+                'Error',
+                error instanceof Error ? `Failed to delete player: ${error.message}` : 'Failed to delete player. Please try again.'
+              );
+            }
           },
         },
       ]

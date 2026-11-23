@@ -77,14 +77,23 @@ export const updatePlayerProfile = async (
   }
 };
 
-export const deletePlayerInfo = async (playerId: string) => {
-  const { error } = await supabase
-    .from('teams')
+// Deletes the player; the database cascades their stats, ratings and
+// scorecard rows. A delete blocked by RLS doesn't error, it removes 0 rows,
+// so an empty result is treated as a failure.
+export const deletePlayerInfo = async (playerId: string): Promise<void> => {
+  const { data, error } = await supabase
+    .from('players')
     .delete()
-    .eq('id', playerId);
+    .eq('id', playerId)
+    .select('id');
   if (error) {
-    console.error("Error uploading team info:", error);
+    console.error("Error deleting player:", error);
     throw error;
+  }
+  if (!data || data.length === 0) {
+    throw new Error(
+      "The player wasn't deleted. You may not have permission to delete players, or the player no longer exists."
+    );
   }
 }
 

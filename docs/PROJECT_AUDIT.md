@@ -44,13 +44,13 @@ FAQ Sports is an Expo (React Native) app that runs on iOS, Android and web, with
 
 | # | Finding | Severity | Where |
 |---|---------|----------|-------|
-| 1 | `deletePlayerInfo` deletes from the **`teams`** table using a player ID. Deleting a player never removes the player, and if IDs ever collided it would delete a team. | Critical (data integrity) | `api/playerApi.ts:29` |
+| 1 | ~~`deletePlayerInfo` deletes from the **`teams`** table using a player ID.~~ **Fixed 2026-11-23:** deletes from `players` and throws when 0 rows are deleted. | Critical (data integrity) | `api/playerApi.ts` |
 | 2 | Authorization exists only in the client. The role lives in AsyncStorage/localStorage, admin screens have no route guard, and server-side RLS is **Unknown**. | Critical (security), pending RLS check | §9 |
 | 3 | The Supabase client is created without a storage adapter, so on iOS/Android the auth session is probably not persisted. After a restart the app still treats the user as signed in (role cached), but requests go out as anonymous. | High | `api/supabaseClient.ts:24` |
 | 4 | Cricket matches and balls are never saved. `uploadBallInfo` and `getMatches` are never called; matches live in React state seeded from mocks and are lost on reload. | High (contradicts docs) | `sports/cricket/*` |
 | 5 | Undo in live scoring only removes the ball from the on-screen "This Over" strip. Score, batsman and bowler figures are not reverted. | High (scoring correctness) | `sports/cricket/engines/scoreEngine.ts:224` |
 | 6 | Several cricket rule bugs: byes/leg-byes don't count as legal deliveries, byes/leg-byes are charged to the bowler, the win margin in wickets is wrong, ties go to team B (or team A on manual end), a wicket on the last ball of the innings doesn't end it, and Hit Wicket is missing from the menu. | High | §10.2 |
-| 7 | Team delete runs `deleteTeamInfo` twice without awaiting or catching errors, and always shows "deleted successfully". | Medium | `app/(tabs)/teams.tsx:245-247` |
+| 7 | ~~Team delete runs `deleteTeamInfo` twice without awaiting or catching errors, and always shows "deleted successfully".~~ **Fixed 2026-11-23:** one awaited call, error alert, success only after the delete is confirmed. | Medium | `app/(tabs)/teams.tsx` |
 | 8 | The "Change Team" modal for players does nothing (`onPress={() => editingPlayer}`). | Medium | `app/(tabs)/teams.tsx:561,585` |
 | 9 | `Alert.alert` with buttons is a no-op on react-native-web, so on web every confirm flow (create/start match, delete, logout, innings change, wicket follow-ups) silently does nothing. | High on web | many files |
 | 10 | The only test cannot run: `supabaseClient.ts` throws without env vars, and the assertion (`'Welcome!'`) doesn't match the screen (`Hello, {userName}!`). | Medium | `__tests__/home-screen-test.tsx` |

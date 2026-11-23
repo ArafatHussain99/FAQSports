@@ -49,14 +49,14 @@ The client is created with default options: no `auth.storage`, so see [AUTHENTIC
 | `getUserRole(email)` | `api/authApi.ts` | `profiles` select `role` by `email` | `'admin' \| 'player' \| null` | Login | Yes; RLS only returns the caller's own row (D12) |
 | `getTeams()` | `api/teamApi.ts` | `teams` select | `Team[]` | `DataProvider` | Yes |
 | `uploadTeamInfo(info)` | `api/teamApi.ts` | `teams` insert | `void` | Teams tab | Yes for any signed-in user, not just admins (R2); duplicate name fails (D13) |
-| `deleteTeamInfo(teamId)` | `api/teamApi.ts` | `teams` delete | `void` | Teams tab | Only for one hard-coded user; for everyone else deletes nothing, no error (R3) |
+| `deleteTeamInfo(teamId)` | `api/teamApi.ts` | `teams` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted (RLS only lets one hard-coded user delete, R3; teams with saved matches are `RESTRICT`ed) |
 | `getPlayers()` | `api/playerApi.ts` | `players` select | `Player[]` | `DataProvider` | Runs, but **stats are always 0** (D1) |
 | `getTeamPlayers(teamId)` | `api/playerApi.ts` | `players` select by team | `Player[]` | **never** | Same as above (D1) |
 | `uploadPlayerInfo(info)` | `api/playerApi.ts` | `players` insert, returns id | `string` | Teams tab | Fails if `position` isn't an exact enum value (D3); no insert policy (R5) |
 | `uploadPlayerStats(stats)` | `api/playerApi.ts` | `player_stats` insert | `void` | Teams tab | Only if RLS is off (R5); best bowling stored as text (D6) |
 | `updatePlayerTeam(playerId, teamId \| null)` | `api/playerApi.ts` | `players` update `team_id`, returns updated ids | `void` (throws if 0 rows changed) | Teams tab (Change Team) | Only if RLS is off on `players` or an UPDATE policy is added (none exists, D18) |
 | `updatePlayerProfile(playerId, { nickname, coverImageKey })` | `api/playerApi.ts` | `players` update `nickname`, `cover_image_key` | `void` (throws if 0 rows; explains a missing-column error) | Player profile (Edit) | Needs migrations `20261119000100` and `20261119000200` |
-| `deletePlayerInfo(playerId)` | `api/playerApi.ts` | **`teams`** delete (bug) | `void` | Teams tab | Deletes nothing (wrong table) |
+| `deletePlayerInfo(playerId)` | `api/playerApi.ts` | `players` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted; `players` has no delete policy yet, so today it always throws (D18) |
 | `getGrounds()` | `api/groundApi.ts` | `grounds` select `name` | `string[]` | `DataProvider`, Manage Stadiums | Yes; doesn't return `id` (D5) |
 | `addGround(name, location?)` | `api/groundApi.ts` | `grounds` insert | `void` | Manage Stadiums | Yes for any signed-in user (R2); duplicate name fails (D13) |
 | `getMatches()` | `sports/cricket/api.ts` | `matches` select | raw rows | **never** | Runs; logs `row.name`, which doesn't exist |
