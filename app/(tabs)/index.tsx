@@ -2,8 +2,9 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Plus, WifiOff, ChevronRight, Trophy, Users, TrendingUp } from 'lucide-react-native';
+import { Bell, Plus, WifiOff } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 import { useCricketMatches } from '@/sports/cricket/context';
 import { useFootballMatches } from '@/sports/football/context';
@@ -13,13 +14,13 @@ import MatchCard from '@/sports/cricket/components/MatchCard';
 import { useTableTennisMatches } from '@/sports/table-tennis/context';
 import TableTennisMatchCard from '@/sports/table-tennis/components/TableTennisMatchCard';
 
-const sportIcons = [
-  { id: 'cricket', name: 'Cricket', emoji: '🏏', color: Colors.cricket },
-  { id: 'football', name: 'Football', emoji: '⚽', color: Colors.football },
-  { id: 'table_tennis', name: 'TT', emoji: '🏓', color: Colors.tableTennis },
-  { id: 'badminton', name: 'Badminton', emoji: '🏸', color: Colors.badminton },
-  { id: 'carrom', name: 'Carrom', emoji: '🎱', color: Colors.carrom },
-  { id: 'uno', name: 'UNO', emoji: '🃏', color: Colors.uno },
+const sports = [
+  { id: 'cricket', name: 'Cricket', color: Colors.cricket },
+  { id: 'football', name: 'Football', color: Colors.football },
+  { id: 'table_tennis', name: 'Table Tennis', color: Colors.tableTennis },
+  { id: 'badminton', name: 'Badminton', color: Colors.badminton },
+  { id: 'carrom', name: 'Carrom', color: Colors.carrom },
+  { id: 'uno', name: 'UNO', color: Colors.uno },
 ];
 
 export default function HomeScreen() {
@@ -92,38 +93,84 @@ export default function HomeScreen() {
   const currentUpcomingMatches = currentSport === 'cricket' ? upcomingMatches : currentSport === 'football' ? upcomingFootballMatches : [];
   const currentCompletedMatches = currentSport === 'cricket' ? completedMatches : currentSport === 'football' ? completedFootballMatches : [];
 
+  const matchCount = currentSport === 'table_tennis'
+    ? tableTennis.matches.length
+    : currentCompletedMatches.length + (currentLiveMatch ? 1 : 0) + currentUpcomingMatches.length;
+
+  const sportLabel = currentSport.charAt(0).toUpperCase() + currentSport.slice(1).replace(/_/g, ' ');
+
+  const stats = [
+    { label: 'Matches', value: matchCount },
+    { label: 'Teams', value: teams.length },
+    { label: 'Players', value: players.length },
+  ];
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hello, {userName}!</Text>
-            <View style={styles.roleContainer}>
-              <View style={[styles.roleBadge, { backgroundColor: isAdmin ? Colors.adminBadge : Colors.playerBadge }]}>
+          <View style={styles.headerText}>
+            <Text style={styles.title} accessibilityRole="header">FAQ Sports</Text>
+            <Text style={styles.greeting} numberOfLines={1}>Hello, {userName}</Text>
+            <View style={styles.tagRow}>
+              <View style={[styles.roleTag, { backgroundColor: isAdmin ? Colors.adminBadge : Colors.playerBadge }]}>
                 <Text style={styles.roleText}>{isAdmin ? 'ADMIN' : 'PLAYER'}</Text>
               </View>
               {!isOnline && (
-                <View style={styles.offlineBadge}>
+                <View style={styles.offlineTag}>
                   <WifiOff size={12} color={Colors.warning} />
-                  <Text style={styles.offlineText}>Offline</Text>
+                  <Text style={styles.offlineText}>OFFLINE</Text>
                 </View>
               )}
             </View>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.notificationBtn}
-              onPress={() => router.push('../notification')}
-            >
-              <Bell size={22} color={Colors.text} />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationCount}>{unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.bellBtn}
+            onPress={() => router.push('../notification')}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          >
+            <Bell size={22} color={Colors.text} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellCount}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.segmentScroll}
+          contentContainerStyle={styles.segmentRow}
+          accessibilityRole="tablist"
+        >
+          {sports.map((sport) => {
+            const selected = currentSport === sport.id;
+            return (
+              <TouchableOpacity
+                key={sport.id}
+                style={[styles.segment, selected && styles.segmentSelected]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={sport.name}
+                onPress={() => {
+                  if (['badminton', 'carrom', 'uno'].includes(sport.id)) {
+                    Alert.alert('Coming Soon', 'This sport will be available soon!');
+                  } else {
+                    setCurrentSport(sport.id as any);
+                  }
+                }}
+              >
+                <View style={[styles.sportPin, { backgroundColor: sport.color }]} />
+                <Text style={[styles.segmentText, selected && styles.segmentTextSelected]} numberOfLines={1}>
+                  {sport.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </SafeAreaView>
 
       <ScrollView
@@ -134,40 +181,16 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
-        <View style={styles.sportsContainer}>
-          <Text style={styles.sectionTitle}>Sports</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
-            {sportIcons.map((sport) => (
-              <TouchableOpacity
-                key={sport.id}
-                style={[
-                  styles.sportCard,
-                  currentSport === sport.id && styles.sportCardActive
-                ]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (['badminton', 'carrom', 'uno'].includes(sport.id)) {
-                    Alert.alert('Coming Soon', 'This sport will be available soon!');
-                  } else {
-                    setCurrentSport(sport.id as any);
-                  }
-                }}
-              >
-                <View style={[styles.sportIcon, { backgroundColor: `${sport.color}20` }]}>
-                  <Text style={styles.sportEmoji}>{sport.emoji}</Text>
-                </View>
-                <Text style={styles.sportName}>{sport.name}</Text>
-                {currentSport === sport.id && (
-                  <View style={[styles.activeDot, { backgroundColor: sport.color }]} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        {currentLiveMatch && currentSport === 'cricket' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Live now</Text>
+            <LiveMatchCard match={currentLiveMatch as CricketMatch} />
+          </View>
+        )}
 
         {isAdmin && (
           <TouchableOpacity
-            style={styles.createMatchBtn}
+            style={styles.createBtn}
             onPress={() => {
               if (currentSport === 'cricket') {
                 router.push('/cricket/create-match');
@@ -178,63 +201,48 @@ export default function HomeScreen() {
               }
             }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Create ${sportLabel} match`}
           >
-            <View style={styles.createMatchContent}>
-              <Plus size={24} color={Colors.text} />
-              <View style={styles.createMatchText}>
-                <Text style={styles.createMatchTitle}>Create {currentSport.charAt(0).toUpperCase() + currentSport.slice(1).replace(/_/g, ' ')} Match</Text>
-                <Text style={styles.createMatchSubtitle}>Set up a new match and manage teams</Text>
-              </View>
-            </View>
-            <ChevronRight size={20} color={Colors.textMuted} />
+            <Plus size={20} color={Colors.onPrimary} />
+            <Text style={styles.createBtnText} numberOfLines={1}>Create {sportLabel} match</Text>
           </TouchableOpacity>
         )}
 
-        {currentLiveMatch && currentSport === 'cricket' && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Live Now</Text>
-              <View style={styles.livePulse} />
-            </View>
-            <LiveMatchCard match={currentLiveMatch as CricketMatch} />
-          </View>
-        )}
-
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Trophy size={24} color={Colors.primary} />
-            <Text style={styles.statNumber}>
-              {currentSport === 'table_tennis'
-                ? tableTennis.matches.length
-                : currentCompletedMatches.length + (currentLiveMatch ? 1 : 0) + currentUpcomingMatches.length}
-            </Text>
-            <Text style={styles.statLabel}>Matches</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Users size={24} color={Colors.secondary} />
-            <Text style={styles.statNumber}>{teams.length}</Text>
-            <Text style={styles.statLabel}>Teams</Text>
-          </View>
-          <View style={styles.statCard}>
-            <TrendingUp size={24} color={Colors.accent} />
-            <Text style={styles.statNumber}>{players.length}</Text>
-            <Text style={styles.statLabel}>Players</Text>
-          </View>
+          {stats.map((stat, index) => (
+            <View key={stat.label} style={[styles.statCell, index > 0 && styles.statCellDivided]}>
+              <Text style={styles.statNumber}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
         </View>
 
         {currentUpcomingMatches.length > 0 && currentSport === 'cricket' && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming</Text>
-              <TouchableOpacity onPress={() => router.push('/matches')}>
-                <Text style={styles.seeAll}>See All</Text>
+              <Text style={styles.sectionTitleInline}>Upcoming</Text>
+              <TouchableOpacity onPress={() => router.push('/matches')} hitSlop={12} accessibilityRole="link">
+                <Text style={styles.seeAll}>See all</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.matchesContainer}>
-              {currentUpcomingMatches.slice(0, 2).map((match) => (
-                <MatchCard key={match.id} match={match as CricketMatch} />
-              ))}
+            {currentUpcomingMatches.slice(0, 2).map((match) => (
+              <MatchCard key={match.id} match={match as CricketMatch} />
+            ))}
+          </View>
+        )}
+
+        {currentCompletedMatches.length > 0 && currentSport === 'cricket' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitleInline}>Recent results</Text>
+              <TouchableOpacity onPress={() => router.push('/matches')} hitSlop={12} accessibilityRole="link">
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
             </View>
+            {currentCompletedMatches.slice(0, 2).map((match) => (
+              <MatchCard key={match.id} match={match as CricketMatch} />
+            ))}
           </View>
         )}
 
@@ -244,7 +252,7 @@ export default function HomeScreen() {
               <Text style={styles.ttMessage}>Loading table tennis matches...</Text>
             )}
             {!!tableTennis.error && (
-              <TouchableOpacity onPress={() => tableTennis.refetch()}>
+              <TouchableOpacity onPress={() => tableTennis.refetch()} accessibilityRole="button">
                 <Text style={styles.ttMessage}>Couldn&apos;t load table tennis matches. Tap to retry.</Text>
               </TouchableOpacity>
             )}
@@ -254,21 +262,17 @@ export default function HomeScreen() {
               </Text>
             )}
             {[
-              { title: 'Live Now', items: tableTennis.liveMatches },
+              { title: 'Live now', items: tableTennis.liveMatches },
               { title: 'Upcoming', items: tableTennis.upcomingMatches },
-              { title: 'Recent Results', items: tableTennis.completedMatches.slice(0, 5) },
+              { title: 'Recent results', items: tableTennis.completedMatches.slice(0, 5) },
             ]
               .filter(group => group.items.length > 0)
               .map(group => (
                 <View key={group.title} style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>{group.title}</Text>
-                  </View>
-                  <View style={styles.matchesContainer}>
-                    {group.items.map(match => (
-                      <TableTennisMatchCard key={match.id} match={match} />
-                    ))}
-                  </View>
+                  <Text style={styles.sectionTitle}>{group.title}</Text>
+                  {group.items.map(match => (
+                    <TableTennisMatchCard key={match.id} match={match} />
+                  ))}
                 </View>
               ))}
           </>
@@ -276,30 +280,30 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Performers</Text>
-            <TouchableOpacity onPress={() => router.push('/teams')}>
-              <Text style={styles.seeAll}>View All</Text>
+            <Text style={styles.sectionTitleInline}>Top performers</Text>
+            <TouchableOpacity onPress={() => router.push('/teams')} hitSlop={12} accessibilityRole="link">
+              <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.topPlayersContainer}>
+          <View style={styles.performerList}>
             {topPlayers.map((player, index) => (
               <TouchableOpacity
                 key={player.id}
-                style={styles.topPlayerCard}
+                style={[styles.performerRow, index > 0 && styles.performerRowRuled]}
                 onPress={() => router.push(`/player/${player.id}`)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${index + 1}. ${player.name}, ${getPlayerStat(player)} ${getStatLabel()}, rating ${player.ratings.overall}`}
               >
-                <View style={[styles.rankBadge, index === 0 && styles.goldRank, index === 1 && styles.silverRank, index === 2 && styles.bronzeRank]}>
-                  <Text style={styles.rankText}>{index + 1}</Text>
-                </View>
-                <View style={styles.playerAvatar}>
-                  <Text style={styles.playerInitial}>{player.name.charAt(0)}</Text>
+                <Text style={styles.rank}>{index + 1}</Text>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarInitial}>{player.name.charAt(0)}</Text>
                 </View>
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
                   <Text style={styles.playerStat}>{getPlayerStat(player)} {getStatLabel()}</Text>
                 </View>
-                <View style={styles.ratingContainer}>
+                <View style={styles.rating}>
                   <Text style={styles.ratingValue}>{player.ratings.overall}</Text>
                   <Text style={styles.ratingLabel}>Rating</Text>
                 </View>
@@ -307,22 +311,6 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
-
-        {currentCompletedMatches.length > 0 && currentSport === 'cricket' && (
-          <View style={[styles.section, { marginBottom: 24 }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Results</Text>
-              <TouchableOpacity onPress={() => router.push('/matches')}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.matchesContainer}>
-              {currentCompletedMatches.slice(0, 2).map((match) => (
-                <MatchCard key={match.id} match={match as CricketMatch} />
-              ))}
-            </View>
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -336,90 +324,120 @@ const styles = StyleSheet.create({
   safeTop: {
     backgroundColor: Colors.background,
   },
-  ttMessage: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
+    ...Type.body,
     color: Colors.textSecondary,
-    fontSize: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    alignItems: 'flex-start',
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+  },
+  headerText: {
+    flex: 1,
+    marginRight: Space.md,
+  },
+  title: {
+    ...Type.largeTitle,
+    color: Colors.text,
   },
   greeting: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 6,
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    marginTop: Space.xxs,
   },
-  roleContainer: {
+  tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.sm,
+    marginTop: Space.sm,
   },
-  roleBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  roleTag: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xxs,
+    borderRadius: Radius.sm,
   },
   roleText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: 0.5,
+    ...Type.tag,
+    color: Colors.ink,
   },
-  offlineBadge: {
+  offlineTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: `${Colors.warning}20`,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: 1,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.warning,
   },
   offlineText: {
-    fontSize: 10,
-    fontWeight: '600',
+    ...Type.tag,
     color: Colors.warning,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  notificationBtn: {
+  bellBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
+    marginRight: -Space.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  notificationBadge: {
+  bellBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 18,
+    top: 4,
+    right: 2,
+    minWidth: 18,
     height: 18,
-    borderRadius: 9,
+    paddingHorizontal: Space.xs,
+    borderRadius: Radius.pill,
     backgroundColor: Colors.live,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  notificationCount: {
-    fontSize: 10,
+  bellCount: {
+    ...Type.tag,
+    letterSpacing: 0,
+    fontVariant: ['tabular-nums'],
+    color: Colors.textInverse,
+  },
+  segmentScroll: {
+    flexGrow: 0,
+    marginHorizontal: Space.xl,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
+  segmentRow: {
+    gap: Space.xl,
+  },
+  segment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs + Space.xxs,
+    minHeight: 44,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  segmentSelected: {
+    borderBottomColor: Colors.ink,
+  },
+  sportPin: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  segmentText: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  segmentTextSelected: {
     fontWeight: '700',
     color: Colors.text,
   },
@@ -427,204 +445,134 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.lg,
     paddingBottom: 100,
   },
-  sportsContainer: {
-    marginBottom: 20,
-  },
-  sportsScroll: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  sportCard: {
-    alignItems: 'center',
-    width: 72,
-  },
-  sportCardActive: {
-    opacity: 1,
-  },
-  sportIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sportEmoji: {
-    fontSize: 28,
-  },
-  sportName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-  },
-  createMatchBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
-  },
-  createMatchContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  createMatchText: {
-    gap: 2,
-  },
-  createMatchTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  createMatchSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
   section: {
-    marginBottom: 24,
+    marginTop: Space.section,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    alignItems: 'baseline',
+    marginBottom: Space.sm,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    paddingHorizontal: 16,
-    marginBottom: 4,
+    marginBottom: Space.sm,
   },
-  livePulse: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.live,
-    marginLeft: 8,
+  sectionTitleInline: {
+    ...Type.title,
+    color: Colors.text,
   },
   seeAll: {
-    fontSize: 14,
+    ...Type.subhead,
     fontWeight: '600',
     color: Colors.primary,
   },
-  matchesContainer: {
-    paddingHorizontal: 16,
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    minHeight: Touch,
+    marginTop: Space.lg,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary,
+  },
+  createBtnText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
   statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 24,
+    marginTop: Space.lg,
+    paddingVertical: Space.md,
+    borderTopWidth: Hairline,
+    borderBottomWidth: Hairline,
+    borderColor: Colors.border,
   },
-  statCard: {
+  statCell: {
     flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
     alignItems: 'center',
-    gap: 8,
+  },
+  statCellDivided: {
+    borderLeftWidth: Hairline,
+    borderLeftColor: Colors.border,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Type.scoreM,
     color: Colors.text,
   },
   statLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
+    ...Type.caption,
+    color: Colors.textSecondary,
+    marginTop: Space.xxs,
   },
-  topPlayersContainer: {
-    paddingHorizontal: 16,
-    gap: 10,
+  ttMessage: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Space.section,
   },
-  topPlayerCard: {
+  performerList: {
+    borderTopWidth: Hairline,
+    borderBottomWidth: Hairline,
+    borderColor: Colors.border,
+  },
+  performerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
+    minHeight: 64,
+    paddingVertical: Space.md,
   },
-  rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Colors.border,
+  performerRowRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  rank: {
+    ...Type.number,
+    width: 24,
+    color: Colors.textSecondary,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: Space.md,
   },
-  goldRank: {
-    backgroundColor: '#FFD700',
-  },
-  silverRank: {
-    backgroundColor: '#C0C0C0',
-  },
-  bronzeRank: {
-    backgroundColor: '#CD7F32',
-  },
-  rankText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.background,
-  },
-  playerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  playerInitial: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.primary,
+  avatarInitial: {
+    ...Type.headline,
+    color: Colors.ink,
   },
   playerInfo: {
     flex: 1,
   },
   playerName: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyStrong,
     color: Colors.text,
-    marginBottom: 2,
   },
   playerStat: {
-    fontSize: 12,
+    ...Type.footnote,
+    fontVariant: ['tabular-nums'],
     color: Colors.textSecondary,
   },
-  ratingContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+  rating: {
+    alignItems: 'flex-end',
+    marginLeft: Space.md,
   },
   ratingValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.primary,
+    ...Type.scoreM,
+    color: Colors.text,
   },
   ratingLabel: {
-    fontSize: 10,
+    ...Type.caption,
     color: Colors.textMuted,
   },
 });

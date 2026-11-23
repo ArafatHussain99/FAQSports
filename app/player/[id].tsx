@@ -1,16 +1,45 @@
 import { updatePlayerProfile } from '@/api/playerApi';
 import Colors from '@/constants/colors';
 import { getPlayerCover, PLAYER_COVERS } from '@/constants/playerCovers';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { Comment } from '@/types';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Comment, PerformanceSummary } from '@/types';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Award, Ban, MessageCircle, Pencil, Send, Shield, Target, X } from 'lucide-react-native';
+import { Ban, Pencil, Send, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const NICKNAME_MAX_LENGTH = 30;
+
+type StatItem = { label: string; value: string | number };
+
+// Same grid as the Profile tab: 2 columns, hairline rules between cells.
+function StatGrid({ items, size = 'large' }: { items: StatItem[]; size?: 'large' | 'medium' }) {
+  return (
+    <View style={styles.statsGrid}>
+      {items.map((stat, index) => (
+        <View
+          key={stat.label}
+          style={[
+            styles.statCell,
+            index % 2 === 1 && styles.statCellRight,
+            index >= 2 && styles.statCellBottom,
+          ]}
+        >
+          <Text style={size === 'large' ? styles.statValue : styles.statValueMedium}>{stat.value}</Text>
+          <Text style={styles.statLabel}>{stat.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// PerformanceSummary has no result yet; read one if the data starts carrying it.
+function getResult(performance: PerformanceSummary): 'win' | 'loss' | null {
+  const result = (performance as PerformanceSummary & { result?: unknown }).result;
+  return result === 'win' || result === 'loss' ? result : null;
+}
 
 export default function PlayerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -98,9 +127,48 @@ export default function PlayerProfileScreen() {
     }
   };
 
-  // Team colour tint behind the cover when no picture is chosen.
-  const coverFallbackColor =
-    team?.color && /^#[0-9A-Fa-f]{6}$/.test(team.color) ? `${team.color}40` : Colors.surface;
+  const overviewStats: StatItem[] = [
+    { label: 'Matches', value: player.stats.matches },
+    { label: 'Runs', value: player.stats.runs },
+    { label: 'Wickets', value: player.stats.wickets },
+    { label: 'Rating', value: player.ratings.overall },
+  ];
+
+  const ratings = [
+    { label: 'Batting', value: player.ratings.batting },
+    { label: 'Bowling', value: player.ratings.bowling },
+    { label: 'Fielding', value: player.ratings.fielding },
+  ];
+
+  const battingStats: StatItem[] = [
+    { label: 'Runs', value: player.stats.runs },
+    { label: 'Balls', value: player.stats.balls },
+    { label: 'Average', value: player.stats.average.toFixed(1) },
+    { label: 'Strike rate', value: player.stats.strikeRate.toFixed(1) },
+    { label: 'Highest', value: player.stats.highestScore },
+    { label: '50s', value: player.stats.fifties },
+    { label: '100s', value: player.stats.centuries },
+  ];
+
+  const bowlingStats: StatItem[] = [
+    { label: 'Wickets', value: player.stats.wickets },
+    { label: 'Economy', value: player.stats.economyRate.toFixed(1) },
+    { label: 'Best', value: player.stats.bestBowling },
+  ];
+
+  const fieldingStats: StatItem[] = [
+    { label: 'Catches', value: player.stats.catches },
+    { label: 'Run outs', value: player.stats.runOuts },
+    { label: 'Stumpings', value: player.stats.stumpings },
+  ];
+
+  const otherStats: StatItem[] = [
+    { label: 'Goals', value: player.stats.goals ?? 0 },
+    { label: 'Assists', value: player.stats.assists ?? 0 },
+    { label: 'Wins', value: player.stats.wins ?? 0 },
+  ];
+
+  const lastFive = player.lastFivePerformances.slice(0, 5);
 
   return (
     <KeyboardAvoidingView
@@ -111,214 +179,103 @@ export default function PlayerProfileScreen() {
       <Stack.Screen options={{ title: player.name }} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.cover, { backgroundColor: coverFallbackColor }, cover && { height: 360 }]}>
-          {cover && (
-            <Image
-              source={cover.source}
-              style={styles.coverImage}
-              resizeMode="cover"
-              accessibilityLabel={`${player.name}'s cover picture`}
-            />
-          )}
-          <LinearGradient
-            colors={['transparent', Colors.card] as const}
-            style={styles.coverGradient}
-            pointerEvents="none"
+        {cover && (
+          <Image
+            source={cover.source}
+            style={styles.coverImage}
+            resizeMode="cover"
+            accessibilityLabel={`${player.name}'s cover picture`}
           />
-          {isAdmin && (
-            <TouchableOpacity
-              style={styles.editProfileBtn}
-              onPress={openEditProfile}
-              accessibilityRole="button"
-              accessibilityLabel="Edit nickname and cover picture"
-            >
-              <Pencil size={14} color={Colors.text} />
-              <Text style={styles.editProfileBtnText}>Edit</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
 
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              {<Text style={styles.avatarText}>{player.name.charAt(0)}</Text>}
-            </View>
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingText}>{player.ratings.overall}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.playerName}>{player.name}</Text>
-          {player.nickname && (
-            <Text style={styles.playerNickname}>&ldquo;{player.nickname}&rdquo;</Text>
-          )}
-          <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
-
-          {team && (
-            <View style={styles.teamBadge}>
-              <View style={[styles.teamDot, { backgroundColor: team.color }]} />
-              <Text style={styles.teamName}>{team.name}</Text>
-            </View>
-          )}
-
-          <View style={styles.quickStats}>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatValue}>{player.stats.matches}</Text>
-              <Text style={styles.quickStatLabel}>Matches</Text>
-            </View>
-            <View style={styles.quickStatDivider} />
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatValue}>{player.stats.runs}</Text>
-              <Text style={styles.quickStatLabel}>Runs</Text>
-            </View>
-            <View style={styles.quickStatDivider} />
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatValue}>{player.stats.wickets}</Text>
-              <Text style={styles.quickStatLabel}>Wickets</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Skill Ratings</Text>
-          <View style={styles.ratingsCard}>
-            <View style={styles.ratingRow}>
-              <View style={[styles.ratingIcon, { backgroundColor: `${Colors.primary}20` }]}>
-                <Target size={18} color={Colors.primary} />
+        <View style={styles.body}>
+          <View style={styles.identity}>
+            <Text style={styles.playerName}>{player.name}</Text>
+            {player.nickname && (
+              <Text style={styles.playerNickname}>&ldquo;{player.nickname}&rdquo;</Text>
+            )}
+            {team && (
+              <View style={styles.teamRow}>
+                <View style={[styles.teamPin, { backgroundColor: team.color }]} />
+                <Text style={styles.teamName}>{team.name}</Text>
               </View>
-              <Text style={styles.ratingLabel}>Batting</Text>
-              <View style={styles.ratingBarContainer}>
-                <View style={[styles.ratingBar, { width: `${player.ratings.batting}%`, backgroundColor: Colors.primary }]} />
+            )}
+            <View style={styles.roleRow}>
+              <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.editProfileBtn}
+                  onPress={openEditProfile}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit nickname and cover picture"
+                >
+                  <Pencil size={16} color={Colors.text} />
+                  <Text style={styles.editProfileBtnText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <StatGrid items={overviewStats} />
+
+          <Text style={styles.sectionTitle}>Skill ratings</Text>
+          <View style={styles.card}>
+            {ratings.map((rating) => (
+              <View key={rating.label} style={styles.ratingItem}>
+                <Text style={styles.ratingLabel}>{rating.label}</Text>
+                <View style={styles.ratingTrack}>
+                  <View style={[styles.ratingBar, { width: `${rating.value}%` }]} />
+                </View>
+                <Text style={styles.ratingValue}>{rating.value}</Text>
               </View>
-              <Text style={styles.ratingValue}>{player.ratings.batting}</Text>
-            </View>
-            <View style={styles.ratingRow}>
-              <View style={[styles.ratingIcon, { backgroundColor: `${Colors.secondary}20` }]}>
-                <Award size={18} color={Colors.secondary} />
-              </View>
-              <Text style={styles.ratingLabel}>Bowling</Text>
-              <View style={styles.ratingBarContainer}>
-                <View style={[styles.ratingBar, { width: `${player.ratings.bowling}%`, backgroundColor: Colors.secondary }]} />
-              </View>
-              <Text style={styles.ratingValue}>{player.ratings.bowling}</Text>
-            </View>
-            <View style={styles.ratingRow}>
-              <View style={[styles.ratingIcon, { backgroundColor: `${Colors.accent}20` }]}>
-                <Shield size={18} color={Colors.accent} />
-              </View>
-              <Text style={styles.ratingLabel}>Fielding</Text>
-              <View style={styles.ratingBarContainer}>
-                <View style={[styles.ratingBar, { width: `${player.ratings.fielding}%`, backgroundColor: Colors.accent }]} />
-              </View>
-              <Text style={styles.ratingValue}>{player.ratings.fielding}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Batting Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.runs}</Text>
-              <Text style={styles.statBoxLabel}>Runs</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.balls}</Text>
-              <Text style={styles.statBoxLabel}>Balls</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.average.toFixed(1)}</Text>
-              <Text style={styles.statBoxLabel}>Average</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.strikeRate.toFixed(1)}</Text>
-              <Text style={styles.statBoxLabel}>Strike Rate</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.highestScore}</Text>
-              <Text style={styles.statBoxLabel}>Highest</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.fifties}</Text>
-              <Text style={styles.statBoxLabel}>50s</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.centuries}</Text>
-              <Text style={styles.statBoxLabel}>100s</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bowling Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.wickets}</Text>
-              <Text style={styles.statBoxLabel}>Wickets</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.economyRate.toFixed(1)}</Text>
-              <Text style={styles.statBoxLabel}>Economy</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.bestBowling}</Text>
-              <Text style={styles.statBoxLabel}>Best</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Fielding Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.catches}</Text>
-              <Text style={styles.statBoxLabel}>Catches</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.runOuts}</Text>
-              <Text style={styles.statBoxLabel}>Run Outs</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.stumpings}</Text>
-              <Text style={styles.statBoxLabel}>Stumpings</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Other Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.goals ?? 0}</Text>
-              <Text style={styles.statBoxLabel}>Goals</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.assists ?? 0}</Text>
-              <Text style={styles.statBoxLabel}>Assists</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statBoxValue}>{player.stats.wins ?? 0}</Text>
-              <Text style={styles.statBoxLabel}>Wins</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.section, { marginBottom: 20 }]}>
-          <View style={styles.commentsHeader}>
-            <MessageCircle size={18} color={Colors.text} />
-            <Text style={styles.sectionTitle}>Comments</Text>
+            ))}
           </View>
 
-          {comments.length === 0 ? (
-            <View style={styles.noComments}>
-              <Text style={styles.noCommentsText}>No comments yet. Be the first to comment!</Text>
-            </View>
+          <Text style={styles.sectionTitle}>Last five</Text>
+          {lastFive.length === 0 ? (
+            <Text style={styles.emptyLine}>No recent matches yet.</Text>
           ) : (
-            <View style={styles.commentsList}>
-              {comments.map((comment) => (
-                <View key={comment.id} style={styles.commentItem}>
+            <View style={styles.formRow}>
+              {lastFive.map((performance) => {
+                const result = getResult(performance);
+                const tone =
+                  result === 'win' ? Colors.completed : result === 'loss' ? Colors.live : Colors.textSecondary;
+                const label = result === 'win' ? 'WIN' : result === 'loss' ? 'LOSS' : 'PLAYED';
+                return (
+                  <View
+                    key={performance.matchId}
+                    style={[styles.formTag, { borderColor: tone }]}
+                    accessibilityLabel={`${label.toLowerCase()} against ${performance.opponent}`}
+                  >
+                    <Text style={[styles.formTagText, { color: tone }]}>{label}</Text>
+                    <Text style={styles.formOpponent} numberOfLines={1}>vs {performance.opponent}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>Batting</Text>
+          <StatGrid items={battingStats} size="medium" />
+
+          <Text style={styles.sectionTitle}>Bowling</Text>
+          <StatGrid items={bowlingStats} size="medium" />
+
+          <Text style={styles.sectionTitle}>Fielding</Text>
+          <StatGrid items={fieldingStats} size="medium" />
+
+          <Text style={styles.sectionTitle}>Other</Text>
+          <StatGrid items={otherStats} size="medium" />
+
+          <Text style={styles.sectionTitle}>Comments</Text>
+          {comments.length === 0 ? (
+            <Text style={styles.emptyLine}>No comments yet. Be the first to comment.</Text>
+          ) : (
+            <View>
+              {comments.map((comment, index) => (
+                <View key={comment.id} style={[styles.commentItem, index > 0 && styles.commentItemRuled]}>
                   <View style={styles.commentAvatar}>
-                    <Text style={styles.commentAvatarText}>{comment.userName.charAt(0)}</Text>
+                    <Text style={styles.commentAvatarText}>{comment.userName.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View style={styles.commentContent}>
                     <Text style={styles.commentUser}>{comment.userName}</Text>
@@ -344,108 +301,116 @@ export default function PlayerProfileScreen() {
           multiline
         />
         <TouchableOpacity
-          style={[styles.sendBtn, !newComment.trim() && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, !newComment.trim() && styles.disabled]}
           onPress={handleAddComment}
           disabled={!newComment.trim()}
+          accessibilityRole="button"
+          accessibilityLabel="Post comment"
         >
-          <Send size={20} color={newComment.trim() ? Colors.background : Colors.textMuted} />
+          <Send size={20} color={Colors.onPrimary} />
         </TouchableOpacity>
       </View>
 
-      {/* Edit Profile Modal (admin only) */}
+      {/* Edit Profile sheet (admin only) */}
       <Modal
         visible={isAdmin && isEditing}
         transparent
         animationType="slide"
         onRequestClose={closeEditProfile}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle} numberOfLines={1}>Edit Profile - {player.name}</Text>
-            <TouchableOpacity
-              onPress={closeEditProfile}
-              disabled={isSavingProfile}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <X size={24} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
-            <Text style={styles.label}>Nickname</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., The Wall"
-              placeholderTextColor={Colors.textMuted}
-              value={editNickname}
-              onChangeText={setEditNickname}
-              maxLength={NICKNAME_MAX_LENGTH}
-              editable={!isSavingProfile}
-              autoCapitalize="words"
-            />
-            <Text style={styles.helperText}>
-              {editNickname.length}/{NICKNAME_MAX_LENGTH} · leave empty for no nickname
-            </Text>
-
-            <Text style={[styles.label, styles.labelSpaced]}>Cover Picture</Text>
-            <View style={styles.coverGrid}>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView edges={['bottom']} style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={1}>Edit profile</Text>
               <TouchableOpacity
-                style={[styles.coverOption, !editCoverKey && styles.coverOptionActive]}
-                onPress={() => setEditCoverKey(null)}
+                style={styles.closeBtn}
+                onPress={closeEditProfile}
                 disabled={isSavingProfile}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: !editCoverKey }}
-                accessibilityLabel="No cover picture"
+                accessibilityRole="button"
+                accessibilityLabel="Close"
               >
-                <View style={styles.coverOptionNone}>
-                  <Ban size={22} color={Colors.textMuted} />
-                  <Text style={styles.coverOptionNoneText}>None</Text>
-                </View>
+                <X size={22} color={Colors.text} />
               </TouchableOpacity>
-              {PLAYER_COVERS.map(option => (
+            </View>
+            <Text style={styles.modalSubtitle} numberOfLines={1}>{player.name}</Text>
+
+            <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
+              <Text style={styles.label}>Nickname</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., The Wall"
+                placeholderTextColor={Colors.textMuted}
+                value={editNickname}
+                onChangeText={setEditNickname}
+                maxLength={NICKNAME_MAX_LENGTH}
+                editable={!isSavingProfile}
+                autoCapitalize="words"
+              />
+              <Text style={styles.helperText}>
+                {editNickname.length}/{NICKNAME_MAX_LENGTH} · leave empty for no nickname
+              </Text>
+
+              <Text style={[styles.label, styles.labelSpaced]}>Cover picture</Text>
+              <View style={styles.coverGrid}>
                 <TouchableOpacity
-                  key={option.key}
-                  style={[styles.coverOption, editCoverKey === option.key && styles.coverOptionActive]}
-                  onPress={() => setEditCoverKey(option.key)}
+                  style={[styles.coverOption, !editCoverKey && styles.coverOptionActive]}
+                  onPress={() => setEditCoverKey(null)}
                   disabled={isSavingProfile}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: editCoverKey === option.key }}
-                  accessibilityLabel={option.label}
+                  accessibilityState={{ selected: !editCoverKey }}
+                  accessibilityLabel="No cover picture"
                 >
-                  <Image source={option.source} style={styles.coverOptionImage} resizeMode="cover" />
+                  <View style={styles.coverOptionNone}>
+                    <Ban size={20} color={Colors.textSecondary} />
+                    <Text style={styles.coverOptionNoneText}>None</Text>
+                  </View>
                 </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.helperText}>
-              Pictures are bundled with the app (assets/images/player-covers).
-            </Text>
-          </ScrollView>
+                {PLAYER_COVERS.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[styles.coverOption, editCoverKey === option.key && styles.coverOptionActive]}
+                    onPress={() => setEditCoverKey(option.key)}
+                    disabled={isSavingProfile}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: editCoverKey === option.key }}
+                    accessibilityLabel={option.label}
+                  >
+                    <Image source={option.source} style={styles.coverOptionImage} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.helperText}>
+                Pictures are bundled with the app (assets/images/player-covers).
+              </Text>
+            </ScrollView>
 
-          {profileError && (
-            <Text style={styles.profileError} accessibilityRole="alert">{profileError}</Text>
-          )}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={closeEditProfile}
-              disabled={isSavingProfile}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modalButton,
-                styles.saveButton,
-                (isSavingProfile || !profileChanged) && styles.disabledButton,
-              ]}
-              onPress={handleSaveProfile}
-              disabled={isSavingProfile || !profileChanged}
-            >
-              <Text style={styles.saveButtonText}>{isSavingProfile ? 'Saving...' : 'Save'}</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+            {profileError && (
+              <Text style={styles.profileError} accessibilityRole="alert">{profileError}</Text>
+            )}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={closeEditProfile}
+                disabled={isSavingProfile}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.saveButton,
+                  (isSavingProfile || !profileChanged) && styles.disabled,
+                ]}
+                onPress={handleSaveProfile}
+                disabled={isSavingProfile || !profileChanged}
+                accessibilityRole="button"
+              >
+                <Text style={styles.saveButtonText}>{isSavingProfile ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -461,393 +426,339 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: Space.xl,
   },
   errorText: {
-    fontSize: 16,
+    ...Type.body,
     color: Colors.textSecondary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 80,
-  },
-  cover: {
-    height: 200,
-    overflow: 'hidden',
+    paddingBottom: Space.xxxl,
   },
   coverImage: {
-    ...StyleSheet.absoluteFillObject,
     width: '100%',
-    height: '100%',
+    height: 320,
+    backgroundColor: Colors.surfaceLight,
   },
-  coverGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 120,
+  body: {
+    paddingHorizontal: Space.xl,
   },
-  editProfileBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  editProfileBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginTop: -56,
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.primary,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  playerNickname: {
-    fontSize: 15,
-    fontStyle: 'italic',
-    fontWeight: '600',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  ratingBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: -5,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.card,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.background,
+  identity: {
+    alignItems: 'flex-start',
+    gap: Space.xs,
+    paddingTop: Space.xl,
+    paddingBottom: Space.xs,
   },
   playerName: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 4,
   },
-  playerPosition: {
-    fontSize: 14,
+  playerNickname: {
+    ...Type.subhead,
+    fontStyle: 'italic',
     color: Colors.textSecondary,
-    marginBottom: 12,
   },
-  teamBadge: {
+  teamRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 20,
+    gap: Space.sm,
+    marginTop: Space.xs,
   },
-  teamDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
+  teamPin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   teamName: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...Type.bodyStrong,
     color: Colors.text,
   },
-  quickStats: {
+  roleRow: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
+    justifyContent: 'space-between',
+    gap: Space.md,
+    marginTop: Space.xs,
   },
-  quickStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  quickStatValue: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  quickStatLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  quickStatDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: Colors.border,
-  },
-  section: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  ratingsCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    gap: 14,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  ratingLabel: {
-    width: 60,
-    fontSize: 13,
+  playerPosition: {
+    ...Type.subhead,
     color: Colors.textSecondary,
+    flexShrink: 1,
   },
-  ratingBarContainer: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 4,
-    marginHorizontal: 12,
-    overflow: 'hidden',
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs + 2,
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
-  ratingBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  ratingValue: {
-    width: 28,
-    fontSize: 14,
-    fontWeight: '600',
+  editProfileBtnText: {
+    ...Type.headline,
     color: Colors.text,
-    textAlign: 'right',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-  },
-  statBox: {
-    width: '31%',
     backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    marginTop: Space.md,
+    overflow: 'hidden',
   },
-  statBoxValue: {
-    fontSize: 20,
-    fontWeight: '700',
+  statCell: {
+    width: '50%',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  statCellRight: {
+    borderLeftWidth: Hairline,
+    borderLeftColor: Colors.border,
+  },
+  statCellBottom: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  statValue: {
+    ...Type.scoreL,
     color: Colors.text,
-    marginBottom: 4,
   },
-  statBoxLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
+  statValueMedium: {
+    ...Type.scoreM,
+    color: Colors.text,
   },
-  commentsHeader: {
+  statLabel: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  sectionTitle: {
+    ...Type.title,
+    color: Colors.text,
+    marginTop: Space.section,
+    marginBottom: Space.sm,
+  },
+  card: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+  },
+  ratingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    minHeight: 40,
   },
-  noComments: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 20,
-    alignItems: 'center',
+  ratingLabel: {
+    ...Type.subhead,
+    width: 72,
+    color: Colors.textSecondary,
   },
-  noCommentsText: {
-    fontSize: 13,
-    color: Colors.textMuted,
+  ratingTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 2,
+    marginHorizontal: Space.md,
+    overflow: 'hidden',
   },
-  commentsList: {
-    gap: 12,
+  ratingBar: {
+    height: '100%',
+    backgroundColor: Colors.ink,
+  },
+  ratingValue: {
+    ...Type.number,
+    width: 32,
+    color: Colors.text,
+    textAlign: 'right',
+  },
+  emptyLine: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  formRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
+  formTag: {
+    maxWidth: 140,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+  },
+  formTagText: {
+    ...Type.tag,
+  },
+  formOpponent: {
+    ...Type.caption,
+    color: Colors.textSecondary,
   },
   commentItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
+    gap: Space.md,
+    paddingVertical: Space.md,
+  },
+  commentItemRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
   commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   commentAvatarText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
+    ...Type.headline,
+    color: Colors.ink,
   },
   commentContent: {
     flex: 1,
+    gap: Space.xxs,
   },
   commentUser: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...Type.bodyStrong,
     color: Colors.text,
-    marginBottom: 4,
   },
   commentText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 4,
+    ...Type.body,
+    color: Colors.text,
   },
   commentTime: {
-    fontSize: 11,
-    color: Colors.textMuted,
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 12,
+    gap: Space.sm,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.sm,
     backgroundColor: Colors.surface,
-    borderTopWidth: 1,
+    borderTopWidth: Hairline,
     borderTopColor: Colors.border,
-    gap: 10,
   },
   commentInput: {
+    ...Type.body,
     flex: 1,
+    minHeight: Touch,
+    maxHeight: 120,
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    paddingTop: Space.md,
+    paddingBottom: Space.md,
     color: Colors.text,
-    maxHeight: 100,
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: Touch,
+    height: Touch,
+    borderRadius: Radius.md,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendBtnDisabled: {
-    backgroundColor: Colors.border,
+  disabled: {
+    opacity: 0.4,
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: Colors.background,
+    justifyContent: 'flex-end',
+    backgroundColor: Colors.scrim,
+  },
+  modalSheet: {
+    maxHeight: '90%',
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    paddingTop: Space.xl,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    gap: Space.md,
+    paddingHorizontal: Space.xl,
   },
   modalTitle: {
+    ...Type.title,
     flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
     color: Colors.text,
+  },
+  modalSubtitle: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    paddingHorizontal: Space.xl,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    marginRight: -Space.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    flex: 1,
+    flexGrow: 0,
   },
   modalContentPadding: {
-    padding: 20,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.lg,
+    paddingBottom: Space.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.subhead,
     color: Colors.text,
-    marginBottom: 8,
+    marginBottom: Space.sm,
   },
   labelSpaced: {
-    marginTop: 24,
+    marginTop: Space.xxl,
   },
   input: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
+    ...Type.body,
+    height: Touch,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingHorizontal: Space.md,
     color: Colors.text,
   },
   helperText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 6,
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    marginTop: Space.xs + 2,
   },
   coverGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: Space.md,
   },
   coverOption: {
-    width: 104,
-    height: 104,
-    borderRadius: 12,
+    width: 96,
+    height: 96,
+    borderRadius: Radius.md,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'transparent',
-    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
   },
   coverOptionActive: {
-    borderColor: Colors.primary,
+    borderWidth: 3,
+    borderColor: Colors.ink,
   },
   coverOptionImage: {
     width: '100%',
@@ -857,50 +768,46 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: Space.xs + 2,
   },
   coverOptionNoneText: {
-    fontSize: 12,
-    color: Colors.textMuted,
+    ...Type.caption,
+    color: Colors.textSecondary,
   },
   profileError: {
+    ...Type.footnote,
     color: Colors.error,
-    fontSize: 13,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.sm,
   },
   modalFooter: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
+    gap: Space.md,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.lg,
+    borderTopWidth: Hairline,
     borderTopColor: Colors.border,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    minHeight: Touch,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
   cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.text,
   },
   saveButton: {
     backgroundColor: Colors.primary,
   },
   saveButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.background,
-  },
-  disabledButton: {
-    opacity: 0.6,
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
 });

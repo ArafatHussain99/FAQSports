@@ -1,9 +1,10 @@
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 import { Player } from '@/types';
 import { TypePlayerInfo } from '@/types/player';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Plus, Trash2, Users, X } from 'lucide-react-native';
+import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
@@ -26,14 +27,26 @@ import { deleteTeamInfo, uploadTeamInfo } from '@/api/teamApi';
 type TabType = 'teams' | 'players';
 type ModalType = 'addPlayer' | 'editPlayerTeam' | 'addTeam' | null;
 
+// Team colour presets, drawn from the sport pin tokens.
+const TEAM_COLOR_PRESETS: { color: string; label: string }[] = [
+  { color: Colors.cricket, label: 'Green' },
+  { color: Colors.tableTennis, label: 'Red' },
+  { color: Colors.football, label: 'Blue' },
+  { color: Colors.carrom, label: 'Orange' },
+  { color: Colors.badminton, label: 'Purple' },
+  { color: Colors.uno, label: 'Teal' },
+];
+const DEFAULT_TEAM_COLOR = TEAM_COLOR_PRESETS[0].color;
+
 // Swipeable Card Component
 interface SwipeableCardProps {
   children: React.ReactNode;
   onDelete: () => void;
   isAdmin: boolean;
+  ruled?: boolean;
 }
 
-function SwipeableCard({ children, onDelete, isAdmin }: SwipeableCardProps) {
+function SwipeableCard({ children, onDelete, isAdmin, ruled }: SwipeableCardProps) {
   const swipeValue = useRef(new Animated.Value(0)).current;
   const isRTL = I18nManager.isRTL;
 
@@ -85,14 +98,19 @@ function SwipeableCard({ children, onDelete, isAdmin }: SwipeableCardProps) {
   };
 
   return (
-    <View style={styles.swipeContainer}>
+    <View style={[styles.swipeContainer, ruled && styles.swipeRuled]}>
+      {isAdmin && (
       <TouchableOpacity
         style={styles.deleteAction}
         onPress={handleDelete}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Delete"
       >
-        <Trash2 size={20} color={Colors.background} />
+        <Trash2 size={20} color={Colors.textInverse} />
+        <Text style={styles.deleteActionText}>Delete</Text>
       </TouchableOpacity>
+      )}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -134,7 +152,7 @@ export default function TeamsScreen() {
   // Add Team Form State
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamShortName, setNewTeamShortName] = useState('');
-  const [newTeamColor, setNewTeamColor] = useState('#2ECC71');
+  const [newTeamColor, setNewTeamColor] = useState(DEFAULT_TEAM_COLOR);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -217,7 +235,7 @@ export default function TeamsScreen() {
 
     setNewTeamName('');
     setNewTeamShortName('');
-    setNewTeamColor('#2ECC71');
+    setNewTeamColor(DEFAULT_TEAM_COLOR);
     setModalType(null);
 
     try {
@@ -316,6 +334,20 @@ export default function TeamsScreen() {
     }
   };
 
+  const getTeam = (teamId?: string | null) => (teamId ? teams.find(t => t.id === teamId) : undefined);
+
+  const renderEmpty = (title: string, subtitle: string) => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptySubtitle}>{subtitle}</Text>
+    </View>
+  );
+
+  const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: 'teams', label: 'Teams', count: teams.length },
+    { key: 'players', label: 'Players', count: players.length },
+  ];
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
@@ -325,29 +357,35 @@ export default function TeamsScreen() {
             <TouchableOpacity
               style={styles.addBtn}
               onPress={() => setModalType(activeTab === 'teams' ? 'addTeam' : 'addPlayer')}
+              accessibilityRole="button"
+              accessibilityLabel={activeTab === 'teams' ? 'Add team' : 'Add player'}
             >
-              <Plus size={20} color={Colors.text} />
+              <Plus size={22} color={Colors.text} />
             </TouchableOpacity>
           )}
         </View>
 
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'teams' && styles.tabActive]}
-            onPress={() => setActiveTab('teams')}
-          >
-            <Text style={[styles.tabText, activeTab === 'teams' && styles.tabTextActive]}>
-              Teams ({teams.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'players' && styles.tabActive]}
-            onPress={() => setActiveTab('players')}
-          >
-            <Text style={[styles.tabText, activeTab === 'players' && styles.tabTextActive]}>
-              Players ({players.length})
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.segmentRow} accessibilityRole="tablist">
+          {tabs.map((t) => {
+            const selected = activeTab === t.key;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.segment, selected && styles.segmentSelected]}
+                onPress={() => setActiveTab(t.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${t.label}, ${t.count}`}
+              >
+                <Text
+                  style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                  numberOfLines={1}
+                >
+                  {t.label} <Text style={styles.segmentCount}>{t.count}</Text>
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </SafeAreaView>
 
@@ -359,30 +397,40 @@ export default function TeamsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
-        {activeTab === 'teams' && (
-          <View style={styles.listContainer}>
-            {teams.map((team) => {
+        {activeTab === 'teams' && teams.length === 0 &&
+          renderEmpty(
+            'No teams yet',
+            isAdmin ? 'Tap + to add one.' : 'Ask an admin to add a team. Pull down to refresh.'
+          )}
+
+        {activeTab === 'teams' && teams.length > 0 && (
+          <View style={styles.group}>
+            {teams.map((team, index) => {
               const teamPlayers = getTeamPlayers(team.id);
               return (
                 <SwipeableCard
                   key={team.id}
                   isAdmin={isAdmin}
                   onDelete={() => handleDeleteTeam(team)}
+                  ruled={index > 0}
                 >
                   <TouchableOpacity
-                    style={styles.teamCard}
+                    style={styles.row}
                     onPress={() => router.push(`/team/${team.id}`)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${team.name}, ${teamPlayers.length} players`}
                   >
-                    <View style={[styles.teamLogo, { backgroundColor: team.color }]}>
-                      <Text style={styles.teamInitials}>{team.shortName}</Text>
+                    <View style={[styles.teamTag, { borderColor: team.color || Colors.ink }]}>
+                      <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
+                      <Text style={styles.teamTagText} numberOfLines={1}>{team.shortName}</Text>
                     </View>
-                    <View style={styles.teamInfo}>
-                      <Text style={styles.teamName}>{team.name}</Text>
-                      <View style={styles.teamMeta}>
-                        <Users size={14} color={Colors.textMuted} />
-                        <Text style={styles.teamMetaText}>{teamPlayers.length} players</Text>
-                      </View>
+                    <View style={styles.rowText}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>{team.name}</Text>
+                      <Text style={styles.rowSubtitle}>
+                        <Text style={styles.number}>{teamPlayers.length}</Text>
+                        {teamPlayers.length === 1 ? ' player' : ' players'}
+                      </Text>
                     </View>
                     <ChevronRight size={20} color={Colors.textMuted} />
                   </TouchableOpacity>
@@ -392,194 +440,198 @@ export default function TeamsScreen() {
           </View>
         )}
 
-        {activeTab === 'players' && (
-          <View style={styles.listContainer}>
-            {players.map((player) => (
-              <SwipeableCard
-                key={player.id}
-                isAdmin={isAdmin}
-                onDelete={() => handleDeletePlayer(player)}
-              >
-                <View style={styles.playerCard}>
+        {activeTab === 'players' && players.length === 0 &&
+          renderEmpty(
+            'No players yet',
+            isAdmin ? 'Tap + to add one.' : 'Ask an admin to add players. Pull down to refresh.'
+          )}
+
+        {activeTab === 'players' && players.length > 0 && (
+          <View style={styles.group}>
+            {players.map((player, index) => {
+              const team = getTeam(player.teamId);
+              return (
+                <SwipeableCard
+                  key={player.id}
+                  isAdmin={isAdmin}
+                  onDelete={() => handleDeletePlayer(player)}
+                  ruled={index > 0}
+                >
                   <TouchableOpacity
-                    style={styles.playerCardContent}
+                    style={styles.row}
                     onPress={() => router.push(`/player/${player.id}`)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
                   >
-                    <View style={styles.playerAvatar}>
-                      <Text style={styles.playerInitial}>{player.name.charAt(0)}</Text>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarInitial}>{player.name.charAt(0).toUpperCase()}</Text>
                     </View>
-                    <View style={styles.playerInfo}>
-                      <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
-                      <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
-                      {player.teamId && (
-                        <Text style={styles.playerTeam} numberOfLines={1}>
-                          {teams.find(t => t.id === player.teamId)?.name || 'Unknown'}
+                    <View style={styles.rowText}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>{player.name}</Text>
+                      <View style={styles.playerMeta}>
+                        {player.teamId ? (
+                          <>
+                            <View style={[styles.pin, { backgroundColor: team?.color || Colors.ink }]} />
+                            <Text style={styles.rowSubtitle} numberOfLines={1}>
+                              {team?.name || 'Unknown'}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={styles.rowSubtitleMuted} numberOfLines={1}>No team</Text>
+                        )}
+                        <Text style={styles.rowSubtitleMuted} numberOfLines={1}>
+                          {' · '}{player.position || 'Player'}
                         </Text>
-                      )}
-                      {!player.teamId && (
-                        <Text style={styles.playerNoTeam}>No team assigned</Text>
-                      )}
-                    </View>
-                    <View style={styles.playerStats}>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{player.stats.runs}</Text>
-                        <Text style={styles.statLabel}>Runs</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{player.stats.wickets}</Text>
-                        <Text style={styles.statLabel}>Wkts</Text>
                       </View>
                     </View>
-                    <View style={styles.ratingBadge}>
-                      <Text style={styles.ratingValue}>{player.ratings.overall}</Text>
+                    <View style={styles.stat}>
+                      <Text style={styles.number}>{player.stats.runs}</Text>
+                      <Text style={styles.statLabel}>Runs</Text>
+                    </View>
+                    <View style={styles.stat}>
+                      <Text style={styles.number}>{player.stats.wickets}</Text>
+                      <Text style={styles.statLabel}>Wkts</Text>
                     </View>
                   </TouchableOpacity>
                   {isAdmin && (
                     <TouchableOpacity
-                      style={styles.editTeamBtn}
+                      style={styles.changeTeamBtn}
                       onPress={() => openChangeTeam(player)}
+                      hitSlop={{ top: 8, bottom: 8 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Change team for ${player.name}`}
                     >
-                      <Text style={styles.editTeamBtnText}>Change Team</Text>
+                      <Text style={styles.changeTeamText}>Change team</Text>
                     </TouchableOpacity>
                   )}
-                </View>
-              </SwipeableCard>
-            ))}
+                </SwipeableCard>
+              );
+            })}
           </View>
         )}
-
       </ScrollView>
 
       {/* Add Player Modal */}
       <Modal visible={modalType === 'addPlayer'} transparent animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add New Player</Text>
-            <TouchableOpacity onPress={() => setModalType(null)}>
-              <X size={24} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.scrim}>
+          <SafeAreaView edges={['bottom']} style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Add player</Text>
 
-          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Player Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter player name"
-                placeholderTextColor={Colors.textMuted}
-                value={newPlayerName}
-                onChangeText={setNewPlayerName}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Position</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., All-rounder, Batsman, Bowler"
-                placeholderTextColor={Colors.textMuted}
-                value={newPlayerPosition}
-                onChangeText={setNewPlayerPosition}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Batting Style</Text>
-              <View style={styles.buttonsRow}>
-                {['right', 'left'].map(style => (
-                  <TouchableOpacity
-                    key={style}
-                    style={[
-                      styles.optionButton,
-                      newPlayerBatting === style && styles.optionButtonActive,
-                    ]}
-                    onPress={() => setNewPlayerBatting(style)}
-                  >
-                    <Text
-                      style={[
-                        styles.optionButtonText,
-                        newPlayerBatting === style && styles.optionButtonTextActive,
-                      ]}
-                    >
-                      {style.charAt(0).toUpperCase() + style.slice(1)}-handed
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent}>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Player name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter player name"
+                  placeholderTextColor={Colors.textMuted}
+                  value={newPlayerName}
+                  onChangeText={setNewPlayerName}
+                />
               </View>
-            </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Bowling Style</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Right-arm medium, Left-arm spin"
-                placeholderTextColor={Colors.textMuted}
-                value={newPlayerBowling}
-                onChangeText={setNewPlayerBowling}
-              />
-            </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Position</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., All-rounder, Batsman, Bowler"
+                  placeholderTextColor={Colors.textMuted}
+                  value={newPlayerPosition}
+                  onChangeText={setNewPlayerPosition}
+                />
+              </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Assign Team (Optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamSelectScroll}>
-                <TouchableOpacity
-                  style={[
-                    styles.teamSelectButton,
-                    !newPlayerTeamId && styles.teamSelectButtonActive,
-                  ]}
-                  onPress={() => setNewPlayerTeamId('')}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Batting style</Text>
+                <View style={styles.optionRow}>
+                  {['right', 'left'].map(style => {
+                    const selected = newPlayerBatting === style;
+                    return (
+                      <TouchableOpacity
+                        key={style}
+                        style={[styles.option, styles.optionFlex, selected && styles.optionSelected]}
+                        onPress={() => setNewPlayerBatting(style)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                          {style.charAt(0).toUpperCase() + style.slice(1)}-handed
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Bowling style</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Right-arm medium, Left-arm spin"
+                  placeholderTextColor={Colors.textMuted}
+                  value={newPlayerBowling}
+                  onChangeText={setNewPlayerBowling}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Team (optional)</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.chipScroll}
+                  contentContainerStyle={styles.chipScrollContent}
                 >
-                  <Text
-                    style={[
-                      styles.teamSelectButtonText,
-                      !newPlayerTeamId && styles.teamSelectButtonTextActive,
-                    ]}
-                  >
-                    No Team
-                  </Text>
-                </TouchableOpacity>
-                {teams.map(team => (
                   <TouchableOpacity
-                    key={team.id}
-                    style={[
-                      styles.teamSelectButton,
-                      newPlayerTeamId === team.id && styles.teamSelectButtonActive,
-                    ]}
-                    onPress={() => setNewPlayerTeamId(team.id)}
+                    style={[styles.option, !newPlayerTeamId && styles.optionSelected]}
+                    onPress={() => setNewPlayerTeamId('')}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: !newPlayerTeamId }}
                   >
-                    <Text
-                      style={[
-                        styles.teamSelectButtonText,
-                        newPlayerTeamId === team.id && styles.teamSelectButtonTextActive,
-                      ]}
-                    >
-                      {team.name}
+                    <Text style={[styles.optionText, !newPlayerTeamId && styles.optionTextSelected]}>
+                      No team
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </ScrollView>
+                  {teams.map(team => {
+                    const selected = newPlayerTeamId === team.id;
+                    return (
+                      <TouchableOpacity
+                        key={team.id}
+                        style={[styles.option, styles.optionWithPin, selected && styles.optionSelected]}
+                        onPress={() => setNewPlayerTeamId(team.id)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                      >
+                        <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
+                        <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                          {team.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </ScrollView>
 
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => setModalType(null)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.submitButton, isSavingPlayer && styles.disabledButton]}
-              onPress={handleAddPlayer}
-              disabled={isSavingPlayer}
-            >
-              <Text style={styles.submitButtonText}>{isSavingPlayer ? 'Adding...' : 'Add Player'}</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+            <View style={styles.sheetFooter}>
+              <TouchableOpacity
+                style={[styles.primaryButton, isSavingPlayer && styles.disabled]}
+                onPress={handleAddPlayer}
+                disabled={isSavingPlayer}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>{isSavingPlayer ? 'Adding...' : 'Add player'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.textButton}
+                onPress={() => setModalType(null)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.textButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Edit Player Team Modal */}
@@ -589,183 +641,156 @@ export default function TeamsScreen() {
         animationType="slide"
         onRequestClose={closeChangeTeam}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              Change Team - {editingPlayer?.name}
+        <View style={styles.scrim}>
+          <SafeAreaView edges={['bottom']} style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle} numberOfLines={2}>
+              Change team for {editingPlayer?.name}
             </Text>
-            <TouchableOpacity
-              onPress={closeChangeTeam}
-              disabled={isSavingTeam}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <X size={24} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
 
-          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
-            <TouchableOpacity
-              style={[
-                styles.teamListItem,
-                !selectedTeamId && styles.teamListItemActive,
-              ]}
-              onPress={() => setSelectedTeamId(null)}
-              disabled={isSavingTeam}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: !selectedTeamId }}
-            >
-              <View style={styles.teamListItemContent}>
-                <Text
-                  style={[
-                    styles.teamListItemText,
-                    !selectedTeamId && styles.teamListItemTextActive,
-                  ]}
+            <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent}>
+              <View style={styles.choiceGroup}>
+                <TouchableOpacity
+                  style={[styles.choiceRow, !selectedTeamId && styles.choiceRowSelected]}
+                  onPress={() => setSelectedTeamId(null)}
+                  disabled={isSavingTeam}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: !selectedTeamId }}
                 >
-                  No Team
-                </Text>
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle}>No team</Text>
+                  </View>
+                  {!selectedTeamId && <Check size={20} color={Colors.onHighlight} />}
+                </TouchableOpacity>
+
+                {teams.map(team => {
+                  const selected = selectedTeamId === team.id;
+                  return (
+                    <TouchableOpacity
+                      key={team.id}
+                      style={[styles.choiceRow, styles.choiceRowRuled, selected && styles.choiceRowSelected]}
+                      onPress={() => setSelectedTeamId(team.id)}
+                      disabled={isSavingTeam}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
+                      <View style={styles.rowText}>
+                        <Text style={styles.rowTitle} numberOfLines={1}>{team.name}</Text>
+                        <Text style={styles.rowSubtitle}>
+                          {getTeamPlayers(team.id).length} players
+                        </Text>
+                      </View>
+                      {selected && <Check size={20} color={Colors.onHighlight} />}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              {!selectedTeamId && (
-                <View style={styles.checkmark} />
-              )}
-            </TouchableOpacity>
+            </ScrollView>
 
-            {teams.map(team => (
+            {changeTeamError && (
+              <Text style={styles.editError} accessibilityRole="alert">{changeTeamError}</Text>
+            )}
+            <View style={styles.sheetFooter}>
               <TouchableOpacity
-                key={team.id}
-                style={[
-                  styles.teamListItem,
-                  selectedTeamId === team.id && styles.teamListItemActive,
-                ]}
-                onPress={() => setSelectedTeamId(team.id)}
-                disabled={isSavingTeam}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selectedTeamId === team.id }}
+                style={[styles.primaryButton, (isSavingTeam || !teamChanged) && styles.disabled]}
+                onPress={handleSaveTeam}
+                disabled={isSavingTeam || !teamChanged}
+                accessibilityRole="button"
               >
-                <View style={[styles.teamListItemDot, { backgroundColor: team.color }]} />
-                <View style={styles.teamListItemContent}>
-                  <Text
-                    style={[
-                      styles.teamListItemText,
-                      selectedTeamId === team.id && styles.teamListItemTextActive,
-                    ]}
-                  >
-                    {team.name}
-                  </Text>
-                  <Text style={styles.teamListItemSubtext}>
-                    {getTeamPlayers(team.id).length} players
-                  </Text>
-                </View>
-                {selectedTeamId === team.id && (
-                  <View style={styles.checkmark} />
-                )}
+                <Text style={styles.primaryButtonText}>{isSavingTeam ? 'Saving...' : 'Save'}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {changeTeamError && (
-            <Text style={styles.editError} accessibilityRole="alert">{changeTeamError}</Text>
-          )}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={closeChangeTeam}
-              disabled={isSavingTeam}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.submitButton,
-                (isSavingTeam || !teamChanged) && styles.disabledButton,
-              ]}
-              onPress={handleSaveTeam}
-              disabled={isSavingTeam || !teamChanged}
-            >
-              <Text style={styles.submitButtonText}>{isSavingTeam ? 'Saving...' : 'Save'}</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+              <TouchableOpacity
+                style={[styles.textButton, isSavingTeam && styles.disabled]}
+                onPress={closeChangeTeam}
+                disabled={isSavingTeam}
+                accessibilityRole="button"
+              >
+                <Text style={styles.textButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Add Team Modal */}
       <Modal visible={modalType === 'addTeam'} transparent animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add New Team</Text>
-            <TouchableOpacity onPress={() => setModalType(null)}>
-              <X size={24} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.scrim}>
+          <SafeAreaView edges={['bottom']} style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Add team</Text>
 
-          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Team Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter team name"
-                placeholderTextColor={Colors.textMuted}
-                value={newTeamName}
-                onChangeText={setNewTeamName}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Short Name (2-4 chars) *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., MIS, ARC"
-                placeholderTextColor={Colors.textMuted}
-                value={newTeamShortName}
-                onChangeText={setNewTeamShortName}
-                maxLength={4}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Team Color</Text>
-              <View style={styles.colorPickerContainer}>
-                {['#2ECC71', '#E74C3C', '#3498DB', '#F39C12', '#9B59B6', '#1ABC9C'].map(
-                  color => (
-                    <TouchableOpacity
-                      key={color}
-                      style={[
-                        styles.colorOption,
-                        { backgroundColor: color },
-                        newTeamColor === color && styles.colorOptionActive,
-                      ]}
-                      onPress={() => setNewTeamColor(color)}
-                    >
-                      {newTeamColor === color && (
-                        <View style={styles.colorOptionCheck} />
-                      )}
-                    </TouchableOpacity>
-                  )
-                )}
+            <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent}>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Team name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter team name"
+                  placeholderTextColor={Colors.textMuted}
+                  value={newTeamName}
+                  onChangeText={setNewTeamName}
+                />
               </View>
-            </View>
-          </ScrollView>
 
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => setModalType(null)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
-              onPress={handleAddTeam}
-            >
-              <Text style={styles.submitButtonText}>Add Team</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Short name (2-4 chars) *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., MIS, ARC"
+                  placeholderTextColor={Colors.textMuted}
+                  value={newTeamShortName}
+                  onChangeText={setNewTeamShortName}
+                  maxLength={4}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Team colour</Text>
+                <View style={styles.swatchRow}>
+                  {TEAM_COLOR_PRESETS.map(preset => {
+                    const selected = newTeamColor === preset.color;
+                    return (
+                      <TouchableOpacity
+                        key={preset.color}
+                        style={[styles.swatchRing, selected && styles.swatchRingSelected]}
+                        onPress={() => setNewTeamColor(preset.color)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={preset.label}
+                      >
+                        <View style={[styles.swatch, { backgroundColor: preset.color }]} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.sheetFooter}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleAddTeam}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>Add team</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.textButton}
+                onPress={() => setModalType(null)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.textButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
     </View>
   );
 }
+
+const SWATCH = 36;
+const SWATCH_RING = 3;
 
 const styles = StyleSheet.create({
   container: {
@@ -779,410 +804,379 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...Type.largeTitle,
     color: Colors.text,
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primary,
+    marginRight: -Space.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tabsContainer: {
+  segmentRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
+    marginHorizontal: Space.xl,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
   },
-  tab: {
+  segment: {
     flex: 1,
-    paddingVertical: 12,
+    minHeight: 44,
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -Hairline,
   },
-  tabActive: {
-    backgroundColor: Colors.primary,
+  segmentSelected: {
+    borderBottomColor: Colors.ink,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
+  segmentText: {
+    ...Type.subhead,
     color: Colors.textSecondary,
   },
-  tabTextActive: {
-    color: Colors.background,
+  segmentTextSelected: {
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  segmentCount: {
+    fontVariant: ['tabular-nums'],
+    color: Colors.textMuted,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.lg,
     paddingBottom: 100,
   },
-  listContainer: {
-    paddingHorizontal: 16,
-  },
-  teamCard: {
+
+  // Grouped list
+  group: {
     backgroundColor: Colors.card,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 110,
-  },
-  teamCardContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  teamLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  teamInitials: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  teamInfo: {
-    flex: 1,
-  },
-  teamName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  teamMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  teamMetaText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  deleteBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  playerCard: {
-    backgroundColor: Colors.card,
-  },
-  playerCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-  },
-  playerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  playerInitial: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  playerPosition: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  playerTeam: {
-    fontSize: 11,
-    color: Colors.primary,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  playerNoTeam: {
-    fontSize: 11,
-    color: Colors.warning,
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
-  playerStats: {
-    flexDirection: 'row',
-    gap: 16,
-    marginRight: 12,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: Colors.textMuted,
-  },
-  ratingBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ratingValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.background,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
   },
   swipeContainer: {
     position: 'relative',
-    marginBottom: 12,
     overflow: 'hidden',
-    borderRadius: 16,
+  },
+  swipeRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
   deleteAction: {
     position: 'absolute',
     right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: Colors.warning,
+    top: 1,
+    bottom: 1,
+    width: 100,
+    backgroundColor: Colors.error,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 100,
+    gap: Space.xxs,
     zIndex: 1,
   },
+  deleteActionText: {
+    ...Type.caption,
+    color: Colors.textInverse,
+  },
   swipeContent: {
+    backgroundColor: Colors.card,
     zIndex: 2,
   },
-  editTeamBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    marginLeft: 74, // lines up with the player name (14 padding + 48 avatar + 12 gap)
-    marginBottom: 14,
-    marginTop: -4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editError: {
-    color: Colors.error,
-    fontSize: 13,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  editTeamBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.background,
-  },
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  modalHeader: {
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    gap: Space.md,
+    minHeight: 64,
+    paddingVertical: Space.md,
+    paddingLeft: Space.lg,
+    paddingRight: Space.md,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  modalContent: {
+  rowText: {
     flex: 1,
+    minWidth: 0,
   },
-  modalContentPadding: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+  rowTitle: {
+    ...Type.bodyStrong,
     color: Colors.text,
   },
-  buttonsRow: {
-    flexDirection: 'row',
-    gap: 12,
+  rowSubtitle: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    flexShrink: 1,
   },
-  optionButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-  },
-  optionButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  optionButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
+  rowSubtitleMuted: {
+    ...Type.footnote,
     color: Colors.textMuted,
+    flexShrink: 1,
   },
-  optionButtonTextActive: {
-    color: Colors.background,
+  number: {
+    ...Type.number,
+    color: Colors.text,
   },
-  teamSelectScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  teamSelectButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-  },
-  teamSelectButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  teamSelectButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  teamSelectButtonTextActive: {
-    color: Colors.background,
-  },
-  colorPickerContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  colorOption: {
-    width: '30%',
-    aspectRatio: 1,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  colorOptionActive: {
-    borderColor: Colors.text,
-  },
-  colorOptionCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-  },
-  teamListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: Colors.surface,
-  },
-  teamListItemActive: {
-    backgroundColor: Colors.primary,
-  },
-  teamListItemDot: {
+  pin: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: 12,
   },
-  teamListItemContent: {
-    flex: 1,
-  },
-  teamListItemText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  teamListItemTextActive: {
-    color: Colors.background,
-  },
-  teamListItemSubtext: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  checkmark: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-  },
-  modalFooter: {
+  teamTag: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-    borderTopWidth: 1,
+    alignItems: 'center',
+    gap: Space.xs + 2,
+    minWidth: 64,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+  },
+  teamTagText: {
+    ...Type.tag,
+    color: Colors.text,
+    textTransform: 'uppercase',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    ...Type.headline,
+    color: Colors.ink,
+  },
+  playerMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs + 2,
+    marginTop: Space.xxs,
+  },
+  stat: {
+    alignItems: 'flex-end',
+    minWidth: 36,
+  },
+  statLabel: {
+    ...Type.caption,
+    color: Colors.textMuted,
+  },
+  changeTeamBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 28,
+    justifyContent: 'center',
+    marginLeft: Space.lg + 40 + Space.md, // lines up with the player name
+    marginTop: -Space.sm,
+    marginBottom: Space.sm,
+  },
+  changeTeamText: {
+    ...Type.footnote,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+
+  // Empty state
+  emptyState: {
+    paddingTop: Space.section * 2,
+    paddingHorizontal: Space.lg,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    ...Type.headline,
+    color: Colors.text,
+    marginBottom: Space.xs,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+
+  // Bottom sheet
+  scrim: {
+    flex: 1,
+    backgroundColor: Colors.scrim,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    maxHeight: '90%',
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.border,
+    marginTop: Space.sm,
+  },
+  sheetTitle: {
+    ...Type.title,
+    color: Colors.text,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.lg,
+    paddingBottom: Space.sm,
+  },
+  sheetBody: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  sheetBodyContent: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.sm,
+    paddingBottom: Space.sm,
+  },
+  sheetFooter: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+    gap: Space.xs,
+    borderTopWidth: Hairline,
     borderTopColor: Colors.border,
   },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+  formGroup: {
+    marginBottom: Space.lg,
+  },
+  label: {
+    ...Type.footnote,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: Space.sm,
+  },
+  input: {
+    height: Touch,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    ...Type.body,
+    color: Colors.text,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  option: {
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelButton: {
-    backgroundColor: Colors.surface,
+  optionFlex: {
+    flex: 1,
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
+  optionWithPin: {
+    flexDirection: 'row',
+    gap: Space.sm,
   },
-  submitButton: {
+  optionSelected: {
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.highlight,
+  },
+  optionText: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  optionTextSelected: {
+    fontWeight: '700',
+    color: Colors.onHighlight,
+  },
+  chipScroll: {
+    marginHorizontal: -Space.xl,
+  },
+  chipScrollContent: {
+    paddingHorizontal: Space.xl,
+    gap: Space.sm,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.md,
+  },
+  swatchRing: {
+    width: SWATCH + SWATCH_RING * 2 + 4,
+    height: SWATCH + SWATCH_RING * 2 + 4,
+    borderRadius: (SWATCH + SWATCH_RING * 2 + 4) / 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchRingSelected: {
+    borderColor: Colors.ink,
+  },
+  swatch: {
+    width: SWATCH,
+    height: SWATCH,
+    borderRadius: SWATCH / 2,
+  },
+  choiceGroup: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: Touch + 8,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+  },
+  choiceRowRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  choiceRowSelected: {
+    backgroundColor: Colors.highlight,
+  },
+  editError: {
+    ...Type.footnote,
+    color: Colors.error,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.sm,
+  },
+  primaryButton: {
+    height: Touch,
+    borderRadius: Radius.md,
     backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  disabledButton: {
-    opacity: 0.6,
+  primaryButtonText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.background,
+  textButton: {
+    height: Touch,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textButtonText: {
+    ...Type.headline,
+    color: Colors.textSecondary,
+  },
+  disabled: {
+    opacity: 0.4,
   },
 });

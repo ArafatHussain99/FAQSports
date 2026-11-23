@@ -4,12 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
 import { useFootballMatches } from '../context';
 import { FootballMatch, FootballMatchFormat } from '../types';
 import { grounds } from '@/mocks/data';
 
 type Step = 'basics' | 'teams' | 'players';
+
+const STEPS: Step[] = ['basics', 'teams', 'players'];
 
 export const footballMatchFormats: { key: FootballMatchFormat; label: string }[] = [
   { key: 'friendly', label: 'Friendly' },
@@ -120,222 +123,251 @@ export default function CreateFootballMatchScreen() {
     }
   };
 
+  const stepIndex = STEPS.indexOf(step);
+  const proceed = !!canProceed();
+  const maxShown = parseInt(totalPlayersEachSide, 10) || 11;
+
+  const renderTeamOption = (
+    team: { id: string; name: string; color: string },
+    selected: boolean,
+    onPress: () => void,
+  ) => (
+    <TouchableOpacity
+      key={team.id}
+      style={[styles.row, selected && styles.rowSelected]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+    >
+      <View style={[styles.pin, { backgroundColor: team.color }]} />
+      <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+        {team.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderPlayerRow = (
+    key: string,
+    name: string,
+    selected: boolean,
+    onPress: () => void,
+    meta?: string,
+  ) => (
+    <TouchableOpacity
+      key={key}
+      style={[styles.row, selected && styles.rowSelected]}
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+    >
+      <View style={[styles.checkBox, selected && styles.checkBoxSelected]}>
+        {selected && <Check size={14} color={Colors.textInverse} strokeWidth={3} />}
+      </View>
+      <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+        {name}
+      </Text>
+      {!!meta && (
+        <Text style={[styles.rowMeta, selected && styles.rowMetaSelected]}>{meta}</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   return (
-    <SafeAreaView edges={['bottom']} style={styles.container}>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           title: 'Create Football Match',
           headerLeft: () => (
-            <TouchableOpacity onPress={handleBack} style={styles.headerBtn}>
-              <X size={24} color={Colors.text} />
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={8}
+            >
+              <X size={22} color={Colors.text} />
             </TouchableOpacity>
           ),
         }}
       />
 
       <View style={styles.progressContainer}>
-        {['basics', 'teams', 'players'].map((s, i) => (
-          <View key={s} style={styles.progressItem}>
-            <View style={[
-              styles.progressDot,
-              step === s && styles.progressDotActive,
-              ['basics', 'teams', 'players'].indexOf(step) > i && styles.progressDotCompleted,
-            ]}>
-              {['basics', 'teams', 'players'].indexOf(step) > i && (
-                <Check size={12} color={Colors.background} />
-              )}
-            </View>
-            {i < 2 && <View style={[
-              styles.progressLine,
-              ['basics', 'teams', 'players'].indexOf(step) > i && styles.progressLineActive,
-            ]} />}
-          </View>
-        ))}
+        <Text style={styles.progressText}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <View style={styles.progressRule}>
+          {STEPS.map((s, i) => (
+            <View
+              key={s}
+              style={[styles.progressSegment, i <= stepIndex && styles.progressSegmentDone]}
+            />
+          ))}
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {step === 'basics' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Match Details</Text>
+          <View>
+            <Text style={styles.stepTitle}>Match details</Text>
 
-            <Text style={styles.label}>Match Format</Text>
-            <View style={styles.optionsRow}>
-              {footballMatchFormats.map((match) => (
-                <TouchableOpacity
-                  key={match.key}
-                  style={[styles.optionChip, styles.optionChipWide, format === match.key && styles.optionChipActive]}
-                  onPress={() => setFormat(match.key)}
-                >
-                  <Text style={[styles.optionText, format === match.key && styles.optionTextActive]}>
-                    {match.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={styles.label}>Match format</Text>
+            <View style={styles.chipRow}>
+              {footballMatchFormats.map((match) => {
+                const selected = format === match.key;
+                return (
+                  <TouchableOpacity
+                    key={match.key}
+                    style={[styles.chip, styles.chipWide, selected && styles.chipSelected]}
+                    onPress={() => setFormat(match.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                      {match.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <Text style={styles.label}>Match Duration (minutes)</Text>
+            <Text style={styles.label}>Match duration (minutes)</Text>
             <TextInput
               style={styles.input}
               value={duration}
               onChangeText={setDuration}
               keyboardType="number-pad"
-              placeholder="e.g., 90"
+              placeholder="e.g. 90"
               placeholderTextColor={Colors.textMuted}
             />
 
-            <Text style={styles.label}>Players in Each Team</Text>
+            <Text style={styles.label}>Players in each team</Text>
             <TextInput
               style={styles.input}
               value={totalPlayersEachSide}
               onChangeText={setTotalPlayersEachSide}
               keyboardType="number-pad"
-              placeholder="e.g., 11"
+              placeholder="e.g. 11"
               placeholderTextColor={Colors.textMuted}
             />
 
-            <Text style={styles.label}>Ground/Stadium</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.optionsScrollView}
-              contentContainerStyle={styles.optionsContent}
-            >
-              {grounds.map((ground) => (
-                <TouchableOpacity
-                  key={ground}
-                  style={[styles.groundChip, selectedGround === ground && styles.groundChipActive]}
-                  onPress={() => setSelectedGround(ground)}
-                >
-                  <Text style={[styles.groundText, selectedGround === ground && styles.groundTextActive]}>
-                    {ground}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <Text style={styles.label}>Ground</Text>
+            <View style={styles.list}>
+              {grounds.map((ground) => {
+                const selected = selectedGround === ground;
+                return (
+                  <TouchableOpacity
+                    key={ground}
+                    style={[styles.row, selected && styles.rowSelected]}
+                    onPress={() => setSelectedGround(ground)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{ground}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         )}
 
         {step === 'teams' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Teams</Text>
+          <View>
+            <Text style={styles.stepTitle}>Select teams</Text>
 
             <Text style={styles.label}>Team A</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.optionsScrollView}
-              contentContainerStyle={styles.optionsContent}
-            >
-              {teams.map((team) => (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[styles.teamChip, teamA === team.id && styles.teamChipActive]}
-                  onPress={() => setTeamA(team.id)}
-                >
-                  <Text style={[styles.teamText, teamA === team.id && styles.teamTextActive]}>
-                    {team.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.list}>
+              {teams.map((team) =>
+                renderTeamOption(team, teamA === team.id, () => setTeamA(team.id)),
+              )}
+            </View>
 
-            <Text style={[styles.label, { marginTop: 20 }]}>Team B</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.optionsScrollView}
-              contentContainerStyle={styles.optionsContent}
-            >
-              {teams.map((team) => (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[styles.teamChip, teamB === team.id && styles.teamChipActive]}
-                  onPress={() => setTeamB(team.id)}
-                >
-                  <Text style={[styles.teamText, teamB === team.id && styles.teamTextActive]}>
-                    {team.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <Text style={styles.label}>Team B</Text>
+            <View style={styles.list}>
+              {teams.map((team) =>
+                renderTeamOption(team, teamB === team.id, () => setTeamB(team.id)),
+              )}
+            </View>
           </View>
         )}
 
         {step === 'players' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Players</Text>
+          <View>
+            <Text style={styles.stepTitle}>Select players</Text>
 
             {teamAData && (
-              <View style={styles.teamSection}>
-                <Text style={styles.teamSectionTitle}>{teamAData.name}</Text>
-                <View style={styles.playerGrid}>
-                  {teamAPlayers.slice(0, parseInt(totalPlayersEachSide, 10) || 11).map((player) => (
-                    <TouchableOpacity
-                      key={player.id}
-                      style={[
-                        styles.playerChip,
-                        playingXI_A.includes(player.id) && styles.playerChipSelected,
-                      ]}
-                      onPress={() => {
+              <>
+                <View style={styles.labelRow}>
+                  <View style={[styles.pin, { backgroundColor: teamAData.color }]} />
+                  <Text style={styles.labelInline}>{teamAData.name}</Text>
+                  <Text style={styles.count}>{playingXI_A.length}/{totalPlayersEachSide}</Text>
+                </View>
+                <View style={styles.list}>
+                  {teamAPlayers.slice(0, maxShown).map((player) =>
+                    renderPlayerRow(
+                      player.id,
+                      player.name,
+                      playingXI_A.includes(player.id),
+                      () => {
                         if (playingXI_A.includes(player.id) || playingXI_A.length < parseInt(totalPlayersEachSide, 10) || 11) {
                           togglePlayerSelection(player.id, 'A');
                         }
-                      }}
-                    >
-                      <Text style={[styles.playerChipText, playingXI_A.includes(player.id) && styles.playerChipTextSelected]}>
-                        {player.name.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                      },
+                      player.position,
+                    ),
+                  )}
                 </View>
-              </View>
+              </>
             )}
 
             {teamBData && (
-              <View style={[styles.teamSection, { marginTop: 20 }]}>
-                <Text style={styles.teamSectionTitle}>{teamBData.name}</Text>
-                <View style={styles.playerGrid}>
-                  {teamBPlayers.slice(0, parseInt(totalPlayersEachSide, 10) || 11).map((player) => (
-                    <TouchableOpacity
-                      key={player.id}
-                      style={[
-                        styles.playerChip,
-                        playingXI_B.includes(player.id) && styles.playerChipSelected,
-                      ]}
-                      onPress={() => {
+              <>
+                <View style={styles.labelRow}>
+                  <View style={[styles.pin, { backgroundColor: teamBData.color }]} />
+                  <Text style={styles.labelInline}>{teamBData.name}</Text>
+                  <Text style={styles.count}>{playingXI_B.length}/{totalPlayersEachSide}</Text>
+                </View>
+                <View style={styles.list}>
+                  {teamBPlayers.slice(0, maxShown).map((player) =>
+                    renderPlayerRow(
+                      player.id,
+                      player.name,
+                      playingXI_B.includes(player.id),
+                      () => {
                         if (playingXI_B.includes(player.id) || playingXI_B.length < parseInt(totalPlayersEachSide, 10) || 11) {
                           togglePlayerSelection(player.id, 'B');
                         }
-                      }}
-                    >
-                      <Text style={[styles.playerChipText, playingXI_B.includes(player.id) && styles.playerChipTextSelected]}>
-                        {player.name.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                      },
+                      player.position,
+                    ),
+                  )}
                 </View>
-              </View>
+              </>
             )}
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={handleBack}
-        >
-          <Text style={styles.cancelButtonText}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, !canProceed() && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed()}
-        >
-          <Text style={styles.buttonText}>{step === 'players' ? 'Create' : 'Next'}</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <SafeAreaView edges={['bottom']} style={styles.footer}>
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryBtn]}
+            onPress={handleBack}
+            accessibilityRole="button"
+          >
+            <Text style={styles.secondaryBtnText}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryBtn, !proceed && styles.disabled]}
+            onPress={handleNext}
+            disabled={!proceed}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !proceed }}
+          >
+            <Text style={styles.primaryBtnText}>
+              {step === 'players' ? 'Create Match' : 'Continue'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -345,226 +377,198 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerBtn: {
-    padding: 8,
+    padding: Space.sm,
   },
   progressContainer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+    gap: Space.sm,
+  },
+  progressText: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  progressRule: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    gap: Space.xs,
   },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.border,
   },
-  progressDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.textMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotActive: {
-    borderColor: Colors.football,
-    backgroundColor: Colors.football,
-  },
-  progressDotCompleted: {
-    backgroundColor: Colors.football,
-    borderColor: Colors.football,
-  },
-  progressLine: {
-    width: 16,
-    height: 2,
-    backgroundColor: Colors.textMuted,
-    marginHorizontal: 8,
-  },
-  progressLineActive: {
-    backgroundColor: Colors.football,
+  progressSegmentDone: {
+    backgroundColor: Colors.ink,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  stepContainer: {
-    marginBottom: 20,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xxxl,
   },
   stepTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: Space.sm,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.text,
-    marginBottom: 8,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    color: Colors.text,
-    fontSize: 14,
-  },
-  optionsRow: {
+  labelRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  optionChip: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginHorizontal: 4,
     alignItems: 'center',
+    gap: Space.sm,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
   },
-  optionChipWide: {
+  labelInline: {
+    ...Type.headline,
+    color: Colors.text,
     flex: 1,
   },
-  optionChipActive: {
-    backgroundColor: Colors.football,
-    borderColor: Colors.football,
+  count: {
+    ...Type.number,
+    color: Colors.textSecondary,
   },
-  optionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  optionTextActive: {
-    color: Colors.background,
-  },
-  optionsScrollView: {
-    marginBottom: 16,
-  },
-  optionsContent: {
-    paddingRight: 20,
-  },
-  groundChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-  },
-  groundChipActive: {
-    backgroundColor: Colors.football,
-    borderColor: Colors.football,
-  },
-  groundText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  groundTextActive: {
-    color: Colors.background,
-  },
-  teamChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-  },
-  teamChipActive: {
-    backgroundColor: Colors.football,
-    borderColor: Colors.football,
-  },
-  teamText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  teamTextActive: {
-    color: Colors.background,
-  },
-  teamSection: {
-    marginBottom: 16,
-  },
-  teamSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  playerGrid: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: Space.sm,
   },
-  playerChip: {
-    width: '33.33%',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  playerChipInner: {
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
+  chip: {
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
     borderColor: Colors.border,
+  },
+  chipWide: {
+    flex: 1,
     alignItems: 'center',
   },
-  playerChipSelected: {
-    backgroundColor: Colors.football,
+  chipSelected: {
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.ink,
   },
-  playerChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
+  chipText: {
+    ...Type.bodyStrong,
+    color: Colors.textSecondary,
+  },
+  chipTextSelected: {
+    color: Colors.onHighlight,
+  },
+  input: {
+    height: Touch,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    textAlign: 'center',
+    paddingHorizontal: Space.lg,
+    ...Type.body,
+    color: Colors.text,
   },
-  playerChipTextSelected: {
-    backgroundColor: Colors.football,
-    borderColor: Colors.football,
-    color: Colors.background,
+  list: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+    backgroundColor: Colors.card,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
+  rowSelected: {
+    backgroundColor: Colors.highlight,
+  },
+  rowText: {
+    ...Type.bodyStrong,
+    color: Colors.text,
+    flex: 1,
+  },
+  rowTextSelected: {
+    color: Colors.onHighlight,
+  },
+  rowMeta: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  rowMetaSelected: {
+    color: Colors.onHighlight,
+  },
+  pin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  checkBox: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.textSecondary,
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBoxSelected: {
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
+  },
+  disabled: {
+    opacity: 0.4,
   },
   footer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.md,
+    backgroundColor: Colors.surface,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  footerRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
+    gap: Space.md,
   },
   button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    height: Touch,
+    borderRadius: Radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.football,
+    justifyContent: 'center',
+    paddingHorizontal: Space.lg,
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.background,
-  },
-  cancelButton: {
-    backgroundColor: Colors.border,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
+  secondaryBtnText: {
+    ...Type.headline,
     color: Colors.text,
+  },
+  primaryBtn: {
+    flex: 2,
+    backgroundColor: Colors.primary,
+  },
+  primaryBtnText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
 });

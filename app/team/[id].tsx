@@ -2,9 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Users, Trophy, TrendingUp, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
+import { Player } from '@/types';
 
 export default function TeamDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,138 +31,132 @@ export default function TeamDetailScreen() {
   const totalRuns = teamPlayers.reduce((sum, p) => sum + p.stats.runs, 0);
   const totalWickets = teamPlayers.reduce((sum, p) => sum + p.stats.wickets, 0);
 
+  const topBy = (pick: (p: Player) => number) =>
+    teamPlayers.length > 0 ? [...teamPlayers].sort((a, b) => pick(b) - pick(a))[0] : undefined;
+
+  const performers = [
+    { title: 'Top run scorer', player: topBy(p => p.stats.runs), value: (p: Player) => p.stats.runs, unit: 'runs' },
+    { title: 'Top wicket taker', player: topBy(p => p.stats.wickets), value: (p: Player) => p.stats.wickets, unit: 'wickets' },
+    { title: 'Top fielder', player: topBy(p => p.stats.catches), value: (p: Player) => p.stats.catches, unit: 'catches' },
+  ];
+
+  const summary = [
+    { label: 'Players', value: teamPlayers.length },
+    { label: 'Total runs', value: totalRuns },
+    { label: 'Wickets', value: totalWickets },
+  ];
+
   return (
     <SafeAreaView edges={['bottom']} style={styles.container}>
       <Stack.Screen options={{ title: team.name }} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <View style={[styles.teamLogo, { backgroundColor: team.color }]}>
-            <Text style={styles.teamInitials}>{team.shortName}</Text>
+          <View style={styles.titleRow}>
+            <View style={[styles.teamPin, { backgroundColor: team.color }]} />
+            <Text style={styles.teamName} numberOfLines={2}>{team.name}</Text>
+            <View style={styles.shortTag}>
+              <Text style={styles.shortTagText}>{team.shortName}</Text>
+            </View>
           </View>
-          <Text style={styles.teamName}>{team.name}</Text>
           {captain && (
             <TouchableOpacity
-              style={styles.captainBadge}
+              style={styles.captainLink}
               onPress={() => router.push(`/player/${captain.id}`)}
+              accessibilityRole="link"
+              hitSlop={{ top: 8, bottom: 8 }}
             >
-              <Text style={styles.captainLabel}>Captain:</Text>
+              <Text style={styles.captainLabel}>Captain</Text>
               <Text style={styles.captainName}>{captain.name}</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Users size={24} color={Colors.primary} />
-            <Text style={styles.statValue}>{teamPlayers.length}</Text>
-            <Text style={styles.statLabel}>Players</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Trophy size={24} color={Colors.secondary} />
-            <Text style={styles.statValue}>{totalRuns}</Text>
-            <Text style={styles.statLabel}>Total Runs</Text>
-          </View>
-          <View style={styles.statCard}>
-            <TrendingUp size={24} color={Colors.accent} />
-            <Text style={styles.statValue}>{totalWickets}</Text>
-            <Text style={styles.statLabel}>Wickets</Text>
-          </View>
+        <View style={styles.summary}>
+          {summary.map((item, index) => (
+            <View key={item.label} style={[styles.summaryCell, index > 0 && styles.summaryCellRuled]}>
+              <Text style={styles.summaryValue}>{item.value}</Text>
+              <Text style={styles.summaryLabel}>{item.label}</Text>
+            </View>
+          ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Squad ({teamPlayers.length})</Text>
-          <View style={styles.playersList}>
-            {teamPlayers.map((player) => (
+        <Text style={styles.sectionTitle}>Squad ({teamPlayers.length})</Text>
+        {teamPlayers.length === 0 ? (
+          <Text style={styles.emptyLine}>No players in this team yet.</Text>
+        ) : (
+          <View style={styles.group}>
+            {teamPlayers.map((player, index) => (
               <TouchableOpacity
                 key={player.id}
-                style={styles.playerCard}
+                style={styles.row}
                 onPress={() => router.push(`/player/${player.id}`)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
               >
-                <View style={styles.playerAvatar}>
-                  <Text style={styles.playerInitial}>{player.name.charAt(0)}</Text>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarInitial}>{player.name.charAt(0).toUpperCase()}</Text>
                 </View>
-                <View style={styles.playerInfo}>
-                  <View style={styles.playerNameRow}>
-                    <Text style={styles.playerName}>{player.name}</Text>
-                    {player.id === team.captain && (
-                      <View style={styles.captainTag}>
-                        <Text style={styles.captainTagText}>C</Text>
-                      </View>
-                    )}
+                <View style={[styles.rowContent, index > 0 && styles.rowContentRuled]}>
+                  <View style={styles.playerInfo}>
+                    <View style={styles.playerNameRow}>
+                      <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
+                      {player.id === team.captain && (
+                        <View style={styles.captainTag} accessibilityLabel="Captain">
+                          <Text style={styles.captainTagText}>C</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.playerRole}>{player.position || 'Player'}</Text>
                   </View>
-                  <Text style={styles.playerRole}>{player.position || 'Player'}</Text>
+                  <View style={styles.playerStat}>
+                    <Text style={styles.playerStatValue}>{player.stats.runs}</Text>
+                    <Text style={styles.playerStatLabel}>runs</Text>
+                  </View>
+                  <View style={styles.playerStat}>
+                    <Text style={styles.playerStatValue}>{player.stats.wickets}</Text>
+                    <Text style={styles.playerStatLabel}>wkts</Text>
+                  </View>
+                  <View style={styles.playerStat}>
+                    <Text style={styles.playerStatValue}>{player.ratings.overall}</Text>
+                    <Text style={styles.playerStatLabel}>rtg</Text>
+                  </View>
+                  <ChevronRight size={20} color={Colors.textMuted} />
                 </View>
-                <View style={styles.playerStats}>
-                  <Text style={styles.playerStatValue}>{player.stats.runs}</Text>
-                  <Text style={styles.playerStatLabel}>runs</Text>
-                </View>
-                <View style={styles.playerStats}>
-                  <Text style={styles.playerStatValue}>{player.stats.wickets}</Text>
-                  <Text style={styles.playerStatLabel}>wkts</Text>
-                </View>
-                <View style={styles.ratingBadge}>
-                  <Text style={styles.ratingValue}>{player.ratings.overall}</Text>
-                </View>
-                <ChevronRight size={18} color={Colors.textMuted} />
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Performers</Text>
-
-          <View style={styles.performerCard}>
-            <Text style={styles.performerTitle}>🏏 Top Run Scorer</Text>
-            {teamPlayers.length > 0 && (
+        <Text style={styles.sectionTitle}>Top performers</Text>
+        <View style={styles.group}>
+          {performers.map((performer, index) => {
+            const top = performer.player;
+            return (
               <TouchableOpacity
-                style={styles.performerRow}
-                onPress={() => router.push(`/player/${[...teamPlayers].sort((a, b) => b.stats.runs - a.stats.runs)[0].id}`)}
+                key={performer.title}
+                style={[styles.performerRow, index > 0 && styles.rowContentRuled]}
+                onPress={top ? () => router.push(`/player/${top.id}`) : undefined}
+                disabled={!top}
+                activeOpacity={0.7}
+                accessibilityRole="button"
               >
-                <Text style={styles.performerName}>
-                  {[...teamPlayers].sort((a, b) => b.stats.runs - a.stats.runs)[0].name}
-                </Text>
-                <Text style={styles.performerStat}>
-                  {[...teamPlayers].sort((a, b) => b.stats.runs - a.stats.runs)[0].stats.runs} runs
-                </Text>
+                <View style={styles.playerInfo}>
+                  <Text style={styles.performerTitle}>{performer.title}</Text>
+                  <Text style={styles.performerName} numberOfLines={1}>
+                    {top ? top.name : 'No players yet'}
+                  </Text>
+                </View>
+                {top && (
+                  <>
+                    <Text style={styles.performerValue}>{performer.value(top)}</Text>
+                    <Text style={styles.performerUnit}>{performer.unit}</Text>
+                    <ChevronRight size={20} color={Colors.textMuted} />
+                  </>
+                )}
               </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.performerCard}>
-            <Text style={styles.performerTitle}>⚾ Top Wicket Taker</Text>
-            {teamPlayers.length > 0 && (
-              <TouchableOpacity
-                style={styles.performerRow}
-                onPress={() => router.push(`/player/${[...teamPlayers].sort((a, b) => b.stats.wickets - a.stats.wickets)[0].id}`)}
-              >
-                <Text style={styles.performerName}>
-                  {[...teamPlayers].sort((a, b) => b.stats.wickets - a.stats.wickets)[0].name}
-                </Text>
-                <Text style={styles.performerStat}>
-                  {[...teamPlayers].sort((a, b) => b.stats.wickets - a.stats.wickets)[0].stats.wickets} wickets
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.performerCard}>
-            <Text style={styles.performerTitle}>🧤 Top Fielder</Text>
-            {teamPlayers.length > 0 && (
-              <TouchableOpacity
-                style={styles.performerRow}
-                onPress={() => router.push(`/player/${[...teamPlayers].sort((a, b) => b.stats.catches - a.stats.catches)[0].id}`)}
-              >
-                <Text style={styles.performerName}>
-                  {[...teamPlayers].sort((a, b) => b.stats.catches - a.stats.catches)[0].name}
-                </Text>
-                <Text style={styles.performerStat}>
-                  {[...teamPlayers].sort((a, b) => b.stats.catches - a.stats.catches)[0].stats.catches} catches
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -176,114 +172,137 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: Space.xl,
   },
   errorText: {
-    fontSize: 16,
+    ...Type.body,
     color: Colors.textSecondary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingHorizontal: Space.xl,
+    paddingBottom: Space.xxxl,
   },
   header: {
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
+    paddingTop: Space.xl,
+    gap: Space.sm,
   },
-  teamLogo: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    justifyContent: 'center',
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: Space.sm,
   },
-  teamInitials: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.text,
+  teamPin: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   teamName: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 8,
+    flexShrink: 1,
   },
-  captainBadge: {
+  shortTag: {
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: Space.xxs,
+  },
+  shortTagText: {
+    ...Type.tag,
+    color: Colors.ink,
+  },
+  captainLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: Space.xs + 2,
+    alignSelf: 'flex-start',
   },
   captainLabel: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    marginRight: 6,
+    ...Type.subhead,
+    color: Colors.textSecondary,
   },
   captainName: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...Type.subhead,
+    fontWeight: '700',
     color: Colors.primary,
   },
-  statsRow: {
+  summary: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
     backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    marginTop: Space.lg,
+    overflow: 'hidden',
   },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '700',
+  summaryCell: {
+    flex: 1,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  summaryCellRuled: {
+    borderLeftWidth: Hairline,
+    borderLeftColor: Colors.border,
+  },
+  summaryValue: {
+    ...Type.scoreM,
     color: Colors.text,
   },
-  statLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  section: {
-    padding: 16,
+  summaryLabel: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 12,
+    marginTop: Space.section,
+    marginBottom: Space.sm,
   },
-  playersList: {
-    gap: 10,
+  emptyLine: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
   },
-  playerCard: {
+  group: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 12,
+    paddingLeft: Space.lg,
+    gap: Space.md,
   },
-  playerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
+  rowContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: 64,
+    paddingVertical: Space.sm,
+    paddingRight: Space.md,
+  },
+  rowContentRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  playerInitial: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.primary,
+  avatarInitial: {
+    ...Type.headline,
+    color: Colors.ink,
   },
   playerInfo: {
     flex: 1,
@@ -291,80 +310,63 @@ const styles = StyleSheet.create({
   playerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: Space.xs + 2,
   },
   playerName: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyStrong,
     color: Colors.text,
+    flexShrink: 1,
   },
   captainTag: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: Colors.highlight,
+    borderRadius: Radius.xs,
+    paddingHorizontal: Space.xs + 1,
+    paddingVertical: 1,
   },
   captainTagText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.background,
+    ...Type.tag,
+    color: Colors.onHighlight,
   },
   playerRole: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
-  playerStats: {
-    alignItems: 'center',
-    marginHorizontal: 8,
+  playerStat: {
+    alignItems: 'flex-end',
+    minWidth: 32,
   },
   playerStatValue: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...Type.number,
     color: Colors.text,
   },
   playerStatLabel: {
-    fontSize: 10,
-    color: Colors.textMuted,
-  },
-  ratingBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  ratingValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.background,
-  },
-  performerCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-  performerTitle: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    marginBottom: 8,
+    ...Type.caption,
+    color: Colors.textSecondary,
   },
   performerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Space.sm,
+    minHeight: Touch + Space.md,
+    paddingVertical: Space.sm,
+    paddingLeft: Space.lg,
+    paddingRight: Space.md,
+  },
+  performerTitle: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   performerName: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyStrong,
     color: Colors.text,
   },
-  performerStat: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.primary,
+  performerValue: {
+    ...Type.scoreM,
+    color: Colors.text,
+  },
+  performerUnit: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    minWidth: 52,
   },
 });

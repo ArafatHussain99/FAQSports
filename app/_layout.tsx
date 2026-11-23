@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { Hairline, Radius, Space, Type } from "@/constants/tokens";
 import { AppProvider, DataProvider, useApp } from "@/context/AppContext";
 import { CricketMatchProvider } from "@/sports/cricket/context";
 import { FootballMatchProvider } from "@/sports/football/context";
@@ -21,7 +22,10 @@ function RootLayoutNav() {
       screenOptions={{
         headerBackTitle: "Back",
         headerStyle: { backgroundColor: Colors.surface },
+        headerShadowVisible: false,
+        headerBackground: () => <View style={styles.headerBackground} />,
         headerTintColor: Colors.text,
+        headerTitleStyle: { color: Colors.ink, fontSize: Type.headline.fontSize, fontWeight: Type.headline.fontWeight },
         contentStyle: { backgroundColor: Colors.background },
       }}
     >
@@ -56,7 +60,7 @@ function GlobalLoadingOverlay() {
 
   return (
     <View style={styles.loadingOverlay} pointerEvents="box-none">
-      <View style={styles.loadingCard}>
+      <View style={styles.loadingCard} accessibilityRole="progressbar" accessibilityLabel={globalLoadingMessage}>
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>{globalLoadingMessage}</Text>
       </View>
@@ -94,25 +98,33 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  headerBackground: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    backgroundColor: Colors.scrim,
     zIndex: 999,
   },
   loadingCard: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderRadius: 16,
+    paddingHorizontal: Space.xxl,
+    paddingVertical: Space.xl,
+    borderRadius: Radius.lg,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     minWidth: 180,
   },
   loadingText: {
-    marginTop: 12,
-    color: Colors.text,
-    fontSize: 14,
+    ...Type.subhead,
     fontWeight: '600',
+    marginTop: Space.md,
+    color: Colors.text,
   },
 });

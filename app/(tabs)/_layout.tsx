@@ -3,8 +3,9 @@ import { Home, Trophy, Users, User, MoreHorizontal } from "lucide-react-native";
 import React from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { Hairline, Type } from "@/constants/tokens";
 
-const TAB_BAR_CONTENT_HEIGHT = 60;
+const TAB_BAR_CONTENT_HEIGHT = 64;
 
 export default function TabLayout() {
   // Android draws edge-to-edge, so the tab bar must sit above the system
@@ -16,19 +17,22 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: Hairline,
+          elevation: 0,
+          shadowOpacity: 0,
           paddingTop: 8,
           paddingBottom: bottomPadding,
           height: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          ...Type.tag,
           fontWeight: '600',
-          marginTop: 4,
+          letterSpacing: 0,
+          marginTop: 2,
         },
         headerShown: false,
       }}

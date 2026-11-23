@@ -1,5 +1,6 @@
 import { isPermissionError, PERMISSION_ERROR_MESSAGE } from '@/api/supabaseClient';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 import { MatchStatus, Player } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -134,7 +136,7 @@ export default function TableTennisScorecardScreen() {
     return (
       <View style={styles.center}>
         <Stack.Screen options={{ title: 'Table Tennis' }} />
-        <ActivityIndicator size="large" color={Colors.tableTennis} />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -226,15 +228,41 @@ export default function TableTennisScorecardScreen() {
 
   const atGameStart = state.scoreA + state.scoreB === 0;
   const lastGame = state.currentGame > 0 ? state.games[state.currentGame - 1] : null;
+  const showPad = canScore && !state.matchOver;
+  const showStartFooter = isAdmin && snapshot.status === 'upcoming';
+  const hasFooter = showPad || showStartFooter;
+  const tagColor = statusColor(snapshot.status);
+  const finishedGames = state.games.filter(g => g.winner);
 
   return (
-    <SafeAreaView edges={['bottom']} style={styles.container}>
-      <Stack.Screen options={{ title: 'Table Tennis' }} />
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView edges={hasFooter ? [] : ['bottom']} style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: 'Table Tennis',
+          headerRight: canScore
+            ? () => (
+                <TouchableOpacity
+                  onPress={handleUndo}
+                  disabled={snapshot.points.length === 0}
+                  style={[styles.iconBtn, snapshot.points.length === 0 && styles.disabled]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Undo last point"
+                  accessibilityState={{ disabled: snapshot.points.length === 0 }}
+                >
+                  <RotateCcw size={22} color={Colors.text} />
+                </TouchableOpacity>
+              )
+            : undefined,
+        }}
+      />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {/* Match info */}
         <View style={styles.infoRow}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor(snapshot.status) }]}>
-            <Text style={styles.statusText}>{snapshot.status.toUpperCase()}</Text>
+          <View style={[styles.statusTag, { borderColor: tagColor }]}>
+            <Text style={[styles.statusText, { color: tagColor }]}>
+              {snapshot.status === 'completed' ? 'RESULT' : snapshot.status.toUpperCase()}
+            </Text>
           </View>
           <Text style={styles.infoText}>
             {config.format === 'double' ? 'Doubles' : 'Singles'} ·{' '}
@@ -246,20 +274,18 @@ export default function TableTennisScorecardScreen() {
 
         {/* Before the match: who serves first and who starts on the right */}
         {snapshot.status === 'upcoming' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Match setup</Text>
+          <View>
+            <Text style={styles.stepTitle}>Match setup</Text>
+            <Text style={styles.vsLine}>
+              {nameA} v {nameB}
+            </Text>
             {isAdmin ? (
-              <>
-                <SetupEditor
-                  config={config}
-                  setup={state.setup}
-                  players={players}
-                  onChange={handleSetupChange}
-                />
-                <TouchableOpacity style={styles.primaryButton} onPress={handleStart}>
-                  <Text style={styles.primaryButtonText}>Start Match</Text>
-                </TouchableOpacity>
-              </>
+              <SetupEditor
+                config={config}
+                setup={state.setup}
+                players={players}
+                onChange={handleSetupChange}
+              />
             ) : (
               <Text style={styles.mutedText}>This match hasn&apos;t started yet.</Text>
             )}
@@ -268,51 +294,63 @@ export default function TableTennisScorecardScreen() {
 
         {snapshot.status !== 'upcoming' && (
           <>
-            {/* Scoreboard */}
+            {/* Scoreboard: the side currently serving sits on the highlighter */}
             <View style={styles.scoreboard}>
               {(['A', 'B'] as TTSide[]).map(side => {
                 const serving = !state.matchOver && state.servingSide === side && snapshot.status === 'live';
                 const score = side === 'A' ? state.scoreA : state.scoreB;
                 const gamesWon = side === 'A' ? state.gamesWonA : state.gamesWonB;
+                const won = state.matchWinner === side;
                 return (
-                  <TouchableOpacity
+                  <View
                     key={side}
                     style={[styles.scorePanel, serving && styles.scorePanelServing]}
-                    activeOpacity={canScore && !state.matchOver ? 0.6 : 1}
-                    disabled={!canScore || state.matchOver}
-                    onPress={() => handlePoint(side)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Point to ${sideName(side)}`}
+                    accessible
+                    accessibilityLabel={`${sideName(side)}: ${score} points, ${gamesWon} games${serving ? ', serving' : ''}`}
                   >
-                    <Text style={styles.panelName} numberOfLines={2}>{sideName(side)}</Text>
-                    <Text style={styles.panelScore}>{score}</Text>
-                    <Text style={styles.panelGames}>Games {gamesWon}</Text>
-                    {serving && <Text style={styles.servingTag}>🏓 Serving</Text>}
-                    {canScore && !state.matchOver && <Text style={styles.tapHint}>Tap for point</Text>}
-                  </TouchableOpacity>
+                    <Text style={[styles.panelName, serving && styles.onHighlight]} numberOfLines={2}>
+                      {sideName(side)}
+                    </Text>
+                    <Text style={[styles.panelScore, serving && styles.onHighlight]}>{score}</Text>
+                    <View style={styles.panelGamesRow}>
+                      <Text style={[styles.panelGamesLabel, serving && styles.onHighlight]}>Games</Text>
+                      <Text style={[styles.panelGames, serving && styles.onHighlight, won && styles.panelGamesWon]}>
+                        {gamesWon}
+                      </Text>
+                    </View>
+                    {serving ? (
+                      <Text style={styles.servingTag}>SERVING</Text>
+                    ) : (
+                      <Text style={styles.servingTagEmpty}> </Text>
+                    )}
+                  </View>
                 );
               })}
             </View>
 
             {/* Service info */}
             {!state.matchOver && snapshot.status === 'live' && (
-              <View style={styles.card}>
-                <View style={styles.serviceHeader}>
-                  <Text style={styles.cardTitle}>Game {state.currentGame + 1}</Text>
+              <View style={styles.block}>
+                <View style={styles.blockHeader}>
+                  <Text style={styles.sectionTitle}>Game {state.currentGame + 1}</Text>
                   {state.isDeuce && (
-                    <View style={styles.deuceBadge}>
-                      <Text style={styles.deuceText}>
-                        {state.advantage ? 'ADVANTAGE' : 'DEUCE'}
-                      </Text>
+                    <View style={styles.deuceTag}>
+                      <Text style={styles.deuceText}>{state.advantage ? 'ADVANTAGE' : 'DEUCE'}</Text>
                     </View>
                   )}
                 </View>
-                <Text style={styles.serviceLine}>
-                  Server: <Text style={styles.bold}>{playerName(players, state.serverId)}</Text>
-                </Text>
-                <Text style={styles.serviceLine}>
-                  Receiver: <Text style={styles.bold}>{playerName(players, state.receiverId)}</Text>
-                </Text>
+                <View style={[styles.serviceRow, styles.serviceRowCurrent]}>
+                  <Text style={styles.serviceRole}>Server</Text>
+                  <Text style={[styles.serviceName, styles.onHighlight]} numberOfLines={1}>
+                    {playerName(players, state.serverId)}
+                  </Text>
+                </View>
+                <View style={styles.serviceRow}>
+                  <Text style={styles.serviceRoleMuted}>Receiver</Text>
+                  <Text style={styles.serviceName} numberOfLines={1}>
+                    {playerName(players, state.receiverId)}
+                  </Text>
+                </View>
                 <Text style={styles.mutedText}>
                   {state.servesLeft === 1 ? 'Last serve of this turn' : `${state.servesLeft} serves left in this turn`}
                   {state.isDeuce ? ' · service changes every point' : ''}
@@ -330,13 +368,13 @@ export default function TableTennisScorecardScreen() {
 
             {/* Between games / before the first point: allow changing server */}
             {canScore && !state.matchOver && atGameStart && (
-              <View style={styles.card}>
+              <View style={styles.block}>
                 {lastGame && (
                   <Text style={styles.gameEndedText}>
                     Game {state.currentGame} to {sideName(lastGame.winner ?? 'A')} ({lastGame.a}-{lastGame.b})
                   </Text>
                 )}
-                <Text style={styles.cardTitle}>Game {state.currentGame + 1} setup</Text>
+                <Text style={styles.sectionTitle}>Game {state.currentGame + 1} setup</Text>
                 <SetupEditor
                   config={config}
                   setup={state.setup}
@@ -348,12 +386,24 @@ export default function TableTennisScorecardScreen() {
 
             {/* Match result */}
             {state.matchOver && state.matchWinner && (
-              <View style={[styles.card, styles.resultCard]}>
-                <Trophy size={28} color={Colors.upcoming} />
-                <Text style={styles.resultTitle}>Winner: {sideName(state.matchWinner)}</Text>
+              <View style={styles.resultBlock}>
+                <View style={styles.resultHeader}>
+                  <Trophy size={20} color={Colors.completed} />
+                  <View style={styles.winnerTag}>
+                    <Text style={styles.winnerTagText}>WINNER</Text>
+                  </View>
+                </View>
+                <Text style={styles.resultTitle}>{sideName(state.matchWinner)}</Text>
                 <Text style={styles.resultSubtitle}>
-                  {Math.max(state.gamesWonA, state.gamesWonB)}-{Math.min(state.gamesWonA, state.gamesWonB)} in games
+                  Won {Math.max(state.gamesWonA, state.gamesWonB)}-{Math.min(state.gamesWonA, state.gamesWonB)} in games
                 </Text>
+                <View style={styles.resultGames}>
+                  {finishedGames.map((game, i) => (
+                    <Text key={i} style={styles.resultGame}>
+                      {game.a}-{game.b}
+                    </Text>
+                  ))}
+                </View>
                 {canScore && (
                   <TouchableOpacity style={styles.primaryButton} onPress={handleFinish}>
                     <Text style={styles.primaryButtonText}>Finish & Save Result</Text>
@@ -367,47 +417,35 @@ export default function TableTennisScorecardScreen() {
               </View>
             )}
 
-            {canScore && (
-              <TouchableOpacity
-                style={[styles.undoButton, snapshot.points.length === 0 && styles.disabled]}
-                onPress={handleUndo}
-                disabled={snapshot.points.length === 0}
-              >
-                <RotateCcw size={18} color={Colors.text} />
-                <Text style={styles.undoText}>Undo last point</Text>
-              </TouchableOpacity>
-            )}
-
             {/* Game-by-game scorecard */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Scorecard</Text>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.tableName, styles.tableHeader]}>Player</Text>
-                {state.games.length === 0 && <Text style={[styles.tableCell, styles.tableHeader]}>G1</Text>}
-                {state.games.map((_, i) => (
-                  <Text key={i} style={[styles.tableCell, styles.tableHeader]}>G{i + 1}</Text>
-                ))}
-                <Text style={[styles.tableCell, styles.tableHeader]}>Games</Text>
-              </View>
-              {(['A', 'B'] as TTSide[]).map(side => (
-                <View key={side} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, styles.tableName]} numberOfLines={1}>
-                    {teamLabel(players, side === 'A' ? config.teamA : config.teamB)}
-                  </Text>
-                  {state.games.length === 0 && <Text style={styles.tableCell}>0</Text>}
-                  {state.games.map((game, i) => (
-                    <Text
-                      key={i}
-                      style={[styles.tableCell, game.winner === side && styles.tableWin]}
-                    >
-                      {side === 'A' ? game.a : game.b}
-                    </Text>
+            <View style={styles.block}>
+              <Text style={styles.sectionTitle}>Scorecard</Text>
+              <View style={styles.table}>
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.tableName, styles.tableHeader]}>Player</Text>
+                  {state.games.length === 0 && <Text style={[styles.tableCell, styles.tableHeader]}>G1</Text>}
+                  {state.games.map((_, i) => (
+                    <Text key={i} style={[styles.tableCell, styles.tableHeader]}>G{i + 1}</Text>
                   ))}
-                  <Text style={[styles.tableCell, styles.bold]}>
-                    {side === 'A' ? state.gamesWonA : state.gamesWonB}
-                  </Text>
+                  <Text style={[styles.tableCell, styles.tableGames, styles.tableHeader]}>Games</Text>
                 </View>
-              ))}
+                {(['A', 'B'] as TTSide[]).map(side => (
+                  <View key={side} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, styles.tableName]} numberOfLines={1}>
+                      {teamLabel(players, side === 'A' ? config.teamA : config.teamB)}
+                    </Text>
+                    {state.games.length === 0 && <Text style={styles.tableCell}>0</Text>}
+                    {state.games.map((game, i) => (
+                      <Text key={i} style={[styles.tableCell, game.winner === side && styles.tableWin]}>
+                        {side === 'A' ? game.a : game.b}
+                      </Text>
+                    ))}
+                    <Text style={[styles.tableCell, styles.tableGames, styles.tableWin]}>
+                      {side === 'A' ? state.gamesWonA : state.gamesWonB}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </>
         )}
@@ -424,19 +462,57 @@ export default function TableTennisScorecardScreen() {
                     <Text style={styles.secondaryButtonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.dangerButton} onPress={handleDelete}>
-                    <Text style={styles.primaryButtonText}>Delete</Text>
+                    <Text style={styles.dangerButtonText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <TouchableOpacity style={styles.deleteLink} onPress={() => setConfirmDelete(true)}>
-                <Trash2 size={16} color={Colors.error} />
+                <Trash2 size={18} color={Colors.error} />
                 <Text style={styles.deleteText}>Delete match</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
       </ScrollView>
+
+      {/* Admin scoring keys: one per side */}
+      {showPad && (
+        <SafeAreaView edges={['bottom']} style={styles.pad}>
+          <View style={styles.padRow}>
+            {(['A', 'B'] as TTSide[]).map(side => (
+              <Pressable
+                key={side}
+                onPress={() => handlePoint(side)}
+                style={({ pressed }) => [styles.pointKey, pressed && styles.pointKeyPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Point to ${sideName(side)}`}
+              >
+                {({ pressed }) => (
+                  <>
+                    <Text style={[styles.pointKeyLabel, pressed && styles.pointKeyTextPressed]}>+1 point</Text>
+                    <Text
+                      style={[styles.pointKeyName, pressed && styles.pointKeyTextPressed]}
+                      numberOfLines={1}
+                    >
+                      {sideName(side)}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </SafeAreaView>
+      )}
+
+      {/* Before the match: start footer */}
+      {showStartFooter && (
+        <SafeAreaView edges={['bottom']} style={styles.footer}>
+          <TouchableOpacity style={styles.primaryButtonFooter} onPress={handleStart}>
+            <Text style={styles.primaryButtonText}>Start Match</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      )}
     </SafeAreaView>
   );
 }
@@ -462,7 +538,7 @@ function SaveIndicator({
   if (state === 'idle') return null;
   if (state === 'error') {
     return (
-      <TouchableOpacity style={styles.saveRow} onPress={onRetry}>
+      <TouchableOpacity style={styles.saveRow} onPress={onRetry} accessibilityRole="button">
         <Text style={styles.errorText}>{errorText}</Text>
       </TouchableOpacity>
     );
@@ -526,7 +602,7 @@ function SetupEditor({
           );
         })}
       {isDoubles && (
-        <Text style={styles.mutedText}>
+        <Text style={[styles.mutedText, styles.setupHint]}>
           The player on the right serves {config.servesPerTurn} times, then swaps sides with their
           partner and service passes to the other team&apos;s player on the right.
         </Text>
@@ -537,7 +613,12 @@ function SetupEditor({
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
         {label}
       </Text>
@@ -562,8 +643,12 @@ function Court({
     const isReceiver = id === state.receiverId;
     return (
       <View style={[styles.courtCell, isServer && styles.courtServer, isReceiver && styles.courtReceiver]}>
-        <Text style={styles.courtName} numberOfLines={1}>{playerName(players, id, true)}</Text>
-        <Text style={styles.courtLabel}>{isServer ? 'Serving' : isReceiver ? 'Receiving' : label}</Text>
+        <Text style={[styles.courtName, isServer && styles.onHighlight]} numberOfLines={1}>
+          {playerName(players, id, true)}
+        </Text>
+        <Text style={[styles.courtLabel, isServer && styles.onHighlight]}>
+          {isServer ? 'Serving' : isReceiver ? 'Receiving' : label}
+        </Text>
       </View>
     );
   };
@@ -595,7 +680,7 @@ function Message({
     <View style={styles.center}>
       <Stack.Screen options={{ title: 'Table Tennis' }} />
       <Text style={styles.messageTitle}>{title}</Text>
-      {subtitle && <Text style={styles.mutedText}>{subtitle}</Text>}
+      {subtitle && <Text style={styles.messageSubtitle}>{subtitle}</Text>}
       {action && (
         <TouchableOpacity style={styles.primaryButton} onPress={action.onPress}>
           <Text style={styles.primaryButtonText}>{action.label}</Text>
@@ -610,331 +695,479 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xxxl,
+    gap: Space.md,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-    gap: 8,
+    padding: Space.xxl,
+    gap: Space.sm,
     backgroundColor: Colors.background,
   },
   messageTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
+    textAlign: 'center',
+  },
+  messageSubtitle: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.sm,
   },
   infoText: {
-    flex: 1,
-    fontSize: 12,
+    ...Type.footnote,
     color: Colors.textSecondary,
+    flex: 1,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+  statusTag: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.background,
+    ...Type.tag,
   },
   saveRow: {
     alignItems: 'flex-end',
+    minHeight: 20,
+    justifyContent: 'center',
   },
-  card: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 16,
-    gap: 6,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  stepTitle: {
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 4,
+    marginTop: Space.sm,
+  },
+  vsLine: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    marginTop: Space.xxs,
+  },
+  sectionTitle: {
+    ...Type.title,
+    color: Colors.text,
+    marginBottom: Space.sm,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginTop: 8,
-    marginBottom: 6,
+    ...Type.headline,
+    color: Colors.text,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
+  },
+  setupHint: {
+    marginTop: Space.md,
   },
   mutedText: {
-    fontSize: 12,
+    ...Type.footnote,
     color: Colors.textSecondary,
   },
   errorText: {
-    fontSize: 12,
+    ...Type.footnote,
     fontWeight: '600',
     color: Colors.error,
   },
-  bold: {
-    fontWeight: '700',
-    color: Colors.text,
+  onHighlight: {
+    color: Colors.onHighlight,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Space.sm,
   },
   chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 1,
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
     borderColor: Colors.border,
     maxWidth: '100%',
   },
   chipActive: {
-    backgroundColor: Colors.tableTennis,
-    borderColor: Colors.tableTennis,
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.ink,
   },
   chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
+    ...Type.bodyStrong,
+    color: Colors.textSecondary,
   },
   chipTextActive: {
-    color: Colors.background,
+    color: Colors.onHighlight,
   },
   primaryButton: {
-    marginTop: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    marginTop: Space.md,
+    height: Touch,
+    paddingHorizontal: Space.xl,
+    borderRadius: Radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.tableTennis,
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
     alignSelf: 'stretch',
   },
+  primaryButtonFooter: {
+    height: Touch,
+    marginBottom: Space.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+  },
   primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
   secondaryButton: {
-    marginTop: 8,
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginTop: Space.sm,
+    height: Touch,
+    borderRadius: Radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.border,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.ink,
     alignSelf: 'stretch',
   },
   secondaryButtonSmall: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.border,
+    height: Touch,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
   secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.text,
   },
   dangerButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    height: Touch,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
     backgroundColor: Colors.error,
+  },
+  dangerButtonText: {
+    ...Type.headline,
+    color: Colors.textInverse,
   },
   scoreboard: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Space.sm,
+    marginTop: Space.xs,
   },
   scorePanel: {
     flex: 1,
-    minHeight: 180,
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 14,
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.xs,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
   scorePanelServing: {
-    borderColor: Colors.tableTennis,
+    backgroundColor: Colors.highlight,
   },
   panelName: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.text,
     textAlign: 'center',
+    minHeight: 44,
   },
   panelScore: {
-    fontSize: 56,
-    fontWeight: '800',
+    ...Type.scoreXL,
     color: Colors.text,
-    marginVertical: 4,
+    marginVertical: Space.xs,
   },
-  panelGames: {
-    fontSize: 13,
-    fontWeight: '600',
+  panelGamesRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Space.xs + 2,
+  },
+  panelGamesLabel: {
+    ...Type.footnote,
     color: Colors.textSecondary,
   },
+  panelGames: {
+    ...Type.number,
+    fontSize: 20,
+    color: Colors.text,
+  },
+  panelGamesWon: {
+    color: Colors.completed,
+  },
   servingTag: {
-    marginTop: 6,
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.tableTennis,
+    ...Type.tag,
+    marginTop: Space.sm,
+    color: Colors.onHighlight,
   },
-  tapHint: {
-    marginTop: 4,
-    fontSize: 11,
-    color: Colors.textMuted,
+  servingTagEmpty: {
+    ...Type.tag,
+    marginTop: Space.sm,
   },
-  serviceHeader: {
+  block: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+    paddingTop: Space.lg,
+    gap: Space.xs,
+  },
+  blockHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  deuceBadge: {
-    backgroundColor: Colors.warning,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+  deuceTag: {
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
+    marginBottom: Space.sm,
   },
   deuceText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: Colors.background,
+    ...Type.tag,
+    color: Colors.warning,
   },
-  serviceLine: {
-    fontSize: 14,
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
+    paddingHorizontal: Space.sm,
+    marginHorizontal: -Space.sm,
+    borderRadius: Radius.xs,
+    gap: Space.md,
+  },
+  serviceRowCurrent: {
+    backgroundColor: Colors.highlight,
+  },
+  serviceRole: {
+    ...Type.footnote,
+    color: Colors.onHighlight,
+    width: 64,
+  },
+  serviceRoleMuted: {
+    ...Type.footnote,
     color: Colors.textSecondary,
+    width: 64,
+  },
+  serviceName: {
+    ...Type.headline,
+    color: Colors.text,
+    flex: 1,
   },
   court: {
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: Colors.borderLight,
-    borderRadius: 8,
+    marginTop: Space.md,
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    borderRadius: Radius.md,
     overflow: 'hidden',
+    backgroundColor: Colors.card,
   },
   courtRow: {
     flexDirection: 'row',
   },
   courtCell: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.xs + 2,
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: Hairline,
     borderColor: Colors.border,
   },
   courtServer: {
-    backgroundColor: Colors.tableTennis,
+    backgroundColor: Colors.highlight,
   },
   courtReceiver: {
     backgroundColor: Colors.surfaceLight,
   },
   courtName: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...Type.bodyStrong,
     color: Colors.text,
   },
   courtLabel: {
-    fontSize: 11,
+    ...Type.caption,
     color: Colors.textSecondary,
   },
   net: {
-    height: 4,
-    backgroundColor: Colors.text,
+    height: 2,
+    backgroundColor: Colors.ink,
   },
   gameEndedText: {
-    fontSize: 14,
+    ...Type.subhead,
     fontWeight: '700',
-    color: Colors.primary,
-    marginBottom: 4,
+    color: Colors.completed,
+    marginBottom: Space.xs,
   },
-  resultCard: {
-    alignItems: 'center',
+  resultBlock: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Space.lg,
+    gap: Space.xs,
   },
-  resultTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  resultSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  undoButton: {
+  resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.surfaceLight,
+    gap: Space.sm,
   },
-  undoText: {
-    fontSize: 14,
-    fontWeight: '600',
+  winnerTag: {
+    borderWidth: 1,
+    borderColor: Colors.completed,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
+  },
+  winnerTagText: {
+    ...Type.tag,
+    color: Colors.completed,
+  },
+  resultTitle: {
+    ...Type.title,
+    color: Colors.text,
+    marginTop: Space.xs,
+  },
+  resultSubtitle: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  resultGames: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.lg,
+    marginTop: Space.sm,
+    paddingTop: Space.sm,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  resultGame: {
+    ...Type.number,
     color: Colors.text,
   },
   disabled: {
     opacity: 0.4,
   },
+  table: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 36,
+    borderBottomWidth: Hairline,
     borderBottomColor: Colors.border,
   },
   tableCell: {
-    width: 40,
-    textAlign: 'center',
+    ...Type.number,
     fontSize: 14,
+    width: 36,
+    textAlign: 'center',
     color: Colors.textSecondary,
   },
   tableName: {
+    ...Type.subhead,
     flex: 1,
     width: undefined,
     textAlign: 'left',
     color: Colors.text,
   },
+  tableGames: {
+    width: 52,
+    textAlign: 'right',
+  },
   tableHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textMuted,
+    ...Type.caption,
+    color: Colors.textSecondary,
   },
   tableWin: {
-    color: Colors.primary,
-    fontWeight: '700',
+    color: Colors.text,
+    fontWeight: '800',
   },
   deleteArea: {
-    marginTop: 12,
+    marginTop: Space.section,
     alignItems: 'center',
-    gap: 8,
+    gap: Space.sm,
   },
   deleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    padding: 8,
+    gap: Space.xs + 2,
+    minHeight: 44,
+    paddingHorizontal: Space.sm,
   },
   deleteText: {
-    fontSize: 14,
+    ...Type.subhead,
     fontWeight: '600',
     color: Colors.error,
   },
   confirmRow: {
     alignItems: 'center',
-    gap: 8,
+    gap: Space.sm,
   },
   confirmButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Space.md,
+  },
+  pad: {
+    backgroundColor: Colors.surface,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+    paddingHorizontal: Space.md,
+    paddingTop: Space.md,
+  },
+  padRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginBottom: Space.md,
+  },
+  pointKey: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.sm,
+  },
+  pointKeyPressed: {
+    backgroundColor: Colors.ink,
+  },
+  pointKeyLabel: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  pointKeyName: {
+    ...Type.headline,
+    color: Colors.text,
+  },
+  pointKeyTextPressed: {
+    color: Colors.textInverse,
+  },
+  footer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    backgroundColor: Colors.surface,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
 });

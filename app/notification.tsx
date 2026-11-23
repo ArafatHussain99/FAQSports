@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
-import { Bell, Trophy, Calendar, CheckCheck } from 'lucide-react-native';
+import { Bell, Trophy, Calendar } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
 
 export default function NotificationsScreen() {
@@ -33,11 +34,11 @@ export default function NotificationsScreen() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'match':
-        return <Trophy size={20} color={Colors.primary} />;
+        return <Trophy size={20} color={Colors.textSecondary} />;
       case 'tournament':
-        return <Calendar size={20} color={Colors.secondary} />;
+        return <Calendar size={20} color={Colors.textSecondary} />;
       default:
-        return <Bell size={20} color={Colors.accent} />;
+        return <Bell size={20} color={Colors.textSecondary} />;
     }
   };
 
@@ -48,37 +49,37 @@ export default function NotificationsScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {notifications.length === 0 ? (
           <View style={styles.emptyState}>
-            <Bell size={64} color={Colors.border} />
-            <Text style={styles.emptyTitle}>No Notifications</Text>
-            <Text style={styles.emptySubtitle}>You&apos;re all caught up!</Text>
+            <Bell size={22} color={Colors.textSecondary} />
+            <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <Text style={styles.emptySubtitle}>
+              You&apos;re all caught up. Match results, live score updates and tournament
+              news will show up here, and tapping one opens its match.
+            </Text>
           </View>
         ) : (
-          <View style={styles.notificationsList}>
+          <View style={styles.list}>
             {notifications.map((notification) => (
               <TouchableOpacity
                 key={notification.id}
-                style={[
-                  styles.notificationCard,
-                  !notification.isRead && styles.notificationUnread,
-                ]}
+                style={[styles.row, !notification.isRead && styles.rowUnread]}
                 onPress={() => handleNotificationPress(notification)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${notification.isRead ? '' : 'Unread. '}${notification.title}. ${notification.message}`}
               >
-                <View style={[
-                  styles.iconContainer,
-                  { backgroundColor: `${notification.type === 'match' ? Colors.primary : notification.type === 'tournament' ? Colors.secondary : Colors.accent}15` }
-                ]}>
+                <View style={styles.iconContainer}>
                   {getIcon(notification.type)}
                 </View>
-                <View style={styles.notificationContent}>
-                  <View style={styles.notificationHeader}>
-                    <Text style={styles.notificationTitle}>{notification.title}</Text>
-                    {notification.isRead && <CheckCheck size={16} color={Colors.primary} />}
-                  </View>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                  <Text style={styles.notificationTime}>{formatTime(notification.createdAt)}</Text>
+                <View style={styles.content}>
+                  <Text style={[styles.title, !notification.isRead && styles.titleUnread]}>
+                    {notification.title}
+                  </Text>
+                  <Text style={styles.message}>{notification.message}</Text>
+                  <Text style={styles.time}>{formatTime(notification.createdAt)}</Text>
                 </View>
-                {!notification.isRead && <View style={styles.unreadDot} />}
+                <View style={styles.dotSlot}>
+                  {!notification.isRead && <View style={styles.unreadDot} />}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -97,77 +98,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingBottom: Space.xxxl,
   },
   emptyState: {
-    alignItems: 'center',
-    paddingTop: 100,
+    alignItems: 'flex-start',
+    gap: Space.sm,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.section * 2,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginTop: 16,
-    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textMuted,
+    ...Type.body,
+    color: Colors.textSecondary,
   },
-  notificationsList: {
-    gap: 12,
+  list: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
-  notificationCard: {
+  row: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    alignItems: 'flex-start',
+    gap: Space.md,
+    minHeight: Touch,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.md,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
   },
-  notificationUnread: {
-    backgroundColor: `${Colors.primary}08`,
-    borderColor: Colors.primary,
+  rowUnread: {
+    backgroundColor: Colors.highlightSoft,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: 22,
+    paddingTop: 1,
     alignItems: 'center',
-    marginRight: 14,
   },
-  notificationContent: {
+  content: {
     flex: 1,
+    gap: Space.xxs,
   },
-  notificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  notificationTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  title: {
+    ...Type.body,
     color: Colors.text,
-    flex: 1,
   },
-  notificationMessage: {
-    fontSize: 13,
+  titleUnread: {
+    ...Type.bodyStrong,
+  },
+  message: {
+    ...Type.subhead,
+    fontWeight: '400',
     color: Colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 6,
   },
-  notificationTime: {
-    fontSize: 11,
-    color: Colors.textMuted,
+  time: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  dotSlot: {
+    width: 8,
+    paddingTop: Space.sm,
   },
   unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-    marginLeft: 8,
-    alignSelf: 'center',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.live,
   },
 });

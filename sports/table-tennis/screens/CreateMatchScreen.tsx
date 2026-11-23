@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
-import { Check, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import { isPermissionError, PERMISSION_ERROR_MESSAGE } from '@/api/supabaseClient';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 import { grounds as mockGrounds } from '@/mocks/data';
 import { useTableTennisMatches } from '../context';
@@ -12,6 +13,8 @@ import { pointsToWinForServes } from '../engines/scoreEngine';
 import { TTFormat } from '../types';
 
 type Step = 'basics' | 'players';
+
+const STEPS: Step[] = ['basics', 'players'];
 
 const BEST_OF_OPTIONS = [1, 3, 5, 7];
 const SERVES_PER_TURN_OPTIONS = [2, 5];
@@ -102,6 +105,47 @@ export default function CreateTableTennisMatchScreen() {
     }
   };
 
+
+  const stepIndex = STEPS.indexOf(step);
+  const proceed = !!canProceed();
+
+  const renderChip = (key: string, label: string, selected: boolean, onPress: () => void) => (
+    <TouchableOpacity
+      key={key}
+      style={[styles.chip, styles.chipWide, selected && styles.chipSelected]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderOptionRow = (key: string, label: string, selected: boolean, onPress: () => void) => (
+    <TouchableOpacity
+      key={key}
+      style={[styles.row, selected && styles.rowSelected]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+    >
+      <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderPlayerList = (label: string, value: string, onSelect: (id: string) => void) => (
+    <>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.list}>
+        {players.map((player) =>
+          renderOptionRow(player.id, player.name, value === player.id, () => onSelect(player.id)),
+        )}
+      </View>
+    </>
+  );
+
   if (!isAdmin) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -113,93 +157,61 @@ export default function CreateTableTennisMatchScreen() {
   }
 
   return (
-    <SafeAreaView edges={['bottom']} style={styles.container}>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           title: 'Create Table Tennis Match',
           headerLeft: () => (
-            <TouchableOpacity onPress={handleBack} style={styles.headerBtn}>
-              <X size={24} color={Colors.text} />
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={8}
+            >
+              <X size={22} color={Colors.text} />
             </TouchableOpacity>
           ),
         }}
       />
 
       <View style={styles.progressContainer}>
-        {['basics', 'players'].map((s, i) => (
-          <View key={s} style={styles.progressItem}>
-            <View style={[
-              styles.progressDot,
-              step === s && styles.progressDotActive,
-              ['basics', 'players'].indexOf(step) > i && styles.progressDotCompleted,
-            ]}>
-              {['basics', 'players'].indexOf(step) > i && (
-                <Check size={12} color={Colors.background} />
-              )}
-            </View>
-            {i < 1 && <View style={[
-              styles.progressLine,
-              ['basics', 'players'].indexOf(step) > i && styles.progressLineActive,
-            ]} />}
-          </View>
-        ))}
+        <Text style={styles.progressText}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <View style={styles.progressRule}>
+          {STEPS.map((s, i) => (
+            <View
+              key={s}
+              style={[styles.progressSegment, i <= stepIndex && styles.progressSegmentDone]}
+            />
+          ))}
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {step === 'basics' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Match Details</Text>
+          <View>
+            <Text style={styles.stepTitle}>Match details</Text>
 
-            <Text style={styles.label}>Match Format</Text>
-            <View style={styles.optionsRow}>
-              <TouchableOpacity
-                style={[styles.optionChip, styles.optionChipWide, format === 'single' && styles.optionChipActive]}
-                onPress={() => changeFormat('single')}
-              >
-                <Text style={[styles.optionText, format === 'single' && styles.optionTextActive]}>
-                  Singles
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.optionChip, styles.optionChipWide, format === 'double' && styles.optionChipActive]}
-                onPress={() => changeFormat('double')}
-              >
-                <Text style={[styles.optionText, format === 'double' && styles.optionTextActive]}>
-                  Doubles
-                </Text>
-              </TouchableOpacity>
+            <Text style={styles.label}>Match format</Text>
+            <View style={styles.chipRow}>
+              {renderChip('single', 'Singles', format === 'single', () => changeFormat('single'))}
+              {renderChip('double', 'Doubles', format === 'double', () => changeFormat('double'))}
             </View>
 
             <Text style={styles.label}>Best of</Text>
-            <View style={styles.optionsRow}>
-              {BEST_OF_OPTIONS.map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.optionChip, bestOf === n && styles.optionChipActive]}
-                  onPress={() => setBestOf(n)}
-                >
-                  <Text style={[styles.optionText, bestOf === n && styles.optionTextActive]}>
-                    {n === 1 ? '1 game' : `${n} games`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.chipRow}>
+              {BEST_OF_OPTIONS.map((n) =>
+                renderChip(String(n), n === 1 ? '1 game' : `${n} games`, bestOf === n, () => setBestOf(n)),
+              )}
             </View>
 
             <Text style={styles.label}>Serves per turn</Text>
-            <View style={styles.optionsRow}>
-              {SERVES_PER_TURN_OPTIONS.map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.optionChip, servesPerTurn === n && styles.optionChipActive]}
-                  onPress={() => setServesPerTurn(n)}
-                >
-                  <Text style={[styles.optionText, servesPerTurn === n && styles.optionTextActive]}>
-                    {n} serves
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.chipRow}>
+              {SERVES_PER_TURN_OPTIONS.map((n) =>
+                renderChip(String(n), `${n} serves`, servesPerTurn === n, () => setServesPerTurn(n)),
+              )}
             </View>
-            <Text style={styles.helperText}>
+            <Text style={[styles.helperText, styles.helperTextBelow]}>
               {format === 'double'
                 ? `Doubles: the player on the right serves ${servesPerTurn} times, swaps sides with their partner, then the other team's player on the right serves.`
                 : `Singles: service changes every ${servesPerTurn} points.`}
@@ -207,162 +219,76 @@ export default function CreateTableTennisMatchScreen() {
             </Text>
 
             <Text style={styles.label}>Venue</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.optionsScrollView}
-              contentContainerStyle={styles.optionsContent}
-            >
-              {grounds.map((ground) => (
-                <TouchableOpacity
-                  key={ground}
-                  style={[styles.groundChip, venue === ground && styles.groundChipActive]}
-                  onPress={() => setSelectedGround(ground)}
-                >
-                  <Text style={[styles.groundText, venue === ground && styles.groundTextActive]}>
-                    {ground}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.list}>
+              {grounds.map((ground) =>
+                renderOptionRow(ground, ground, venue === ground, () => setSelectedGround(ground)),
+              )}
+            </View>
           </View>
         )}
 
         {step === 'players' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Players</Text>
+          <View>
+            <Text style={styles.stepTitle}>Select players</Text>
 
-            <View style={styles.playerSection}>
-              <Text style={styles.sectionLabel}>Team A / Player 1</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.optionsScrollView}
-                contentContainerStyle={styles.optionsContent}
-              >
-                {players.map((player) => (
-                  <TouchableOpacity
-                    key={player.id}
-                    style={[styles.playerChip, playerA === player.id && styles.playerChipActive]}
-                    onPress={() => setPlayerA(player.id)}
-                  >
-                    <Text style={[styles.playerChipText, playerA === player.id && styles.playerChipTextActive]}>
-                      {player.name.split(' ')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={styles.playerSection}>
-              <Text style={styles.sectionLabel}>Team B / Player 2</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.optionsScrollView}
-                contentContainerStyle={styles.optionsContent}
-              >
-                {players.map((player) => (
-                  <TouchableOpacity
-                    key={player.id}
-                    style={[styles.playerChip, playerB === player.id && styles.playerChipActive]}
-                    onPress={() => setPlayerB(player.id)}
-                  >
-                    <Text style={[styles.playerChipText, playerB === player.id && styles.playerChipTextActive]}>
-                      {player.name.split(' ')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+            {renderPlayerList('Team A / Player 1', playerA, setPlayerA)}
+            {renderPlayerList('Team B / Player 2', playerB, setPlayerB)}
 
             {format === 'double' && (
               <>
-                <View style={styles.playerSection}>
-                  <Text style={styles.sectionLabel}>Partner for Team A</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.optionsScrollView}
-                    contentContainerStyle={styles.optionsContent}
-                  >
-                    {players.map((player) => (
-                      <TouchableOpacity
-                        key={player.id}
-                        style={[styles.playerChip, partnerA === player.id && styles.playerChipActive]}
-                        onPress={() => setPartnerA(player.id)}
-                      >
-                        <Text style={[styles.playerChipText, partnerA === player.id && styles.playerChipTextActive]}>
-                          {player.name.split(' ')[0]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                <View style={styles.playerSection}>
-                  <Text style={styles.sectionLabel}>Partner for Team B</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.optionsScrollView}
-                    contentContainerStyle={styles.optionsContent}
-                  >
-                    {players.map((player) => (
-                      <TouchableOpacity
-                        key={player.id}
-                        style={[styles.playerChip, partnerB === player.id && styles.playerChipActive]}
-                        onPress={() => setPartnerB(player.id)}
-                      >
-                        <Text style={[styles.playerChipText, partnerB === player.id && styles.playerChipTextActive]}>
-                          {player.name.split(' ')[0]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+                {renderPlayerList('Partner for Team A', partnerA, setPartnerA)}
+                {renderPlayerList('Partner for Team B', partnerB, setPartnerB)}
               </>
             )}
           </View>
         )}
       </ScrollView>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
-      {step === 'basics' ? (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={handleBack}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, !canProceed() && styles.buttonDisabled]}
-            onPress={handleNext}
-            disabled={!canProceed()}
-          >
-            <Text style={styles.buttonText}>Next</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton, !canProceed() && styles.buttonDisabled]}
-            onPress={() => handleCreateMatch(false)}
-            disabled={!canProceed()}
-          >
-            <Text style={styles.cancelButtonText}>Save for Later</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, !canProceed() && styles.buttonDisabled]}
-            onPress={() => handleCreateMatch(true)}
-            disabled={!canProceed()}
-          >
-            <Text style={styles.buttonText}>Start Now</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </SafeAreaView>
+      <SafeAreaView edges={['bottom']} style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {step === 'basics' ? (
+          <View style={styles.footerRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryBtn]}
+              onPress={handleBack}
+              accessibilityRole="button"
+            >
+              <Text style={styles.secondaryBtnText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.primaryBtn, !proceed && styles.disabled]}
+              onPress={handleNext}
+              disabled={!proceed}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !proceed }}
+            >
+              <Text style={styles.primaryBtnText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.footerRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryBtn, styles.equalBtn, !proceed && styles.disabled]}
+              onPress={() => handleCreateMatch(false)}
+              disabled={!proceed}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !proceed }}
+            >
+              <Text style={styles.secondaryBtnText}>Save for later</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.primaryBtn, styles.equalBtn, !proceed && styles.disabled]}
+              onPress={() => handleCreateMatch(true)}
+              disabled={!proceed}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !proceed }}
+            >
+              <Text style={styles.primaryBtnText}>Start now</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -371,199 +297,170 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  headerBtn: {
-    padding: 8,
-  },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: Space.xxl,
+  },
+  headerBtn: {
+    padding: Space.sm,
   },
   helperText: {
-    fontSize: 12,
+    ...Type.footnote,
     color: Colors.textSecondary,
-    marginTop: -8,
-    marginBottom: 20,
-    lineHeight: 18,
+  },
+  helperTextBelow: {
+    marginTop: Space.sm,
   },
   errorText: {
-    fontSize: 13,
+    ...Type.footnote,
     fontWeight: '600',
     color: Colors.error,
     textAlign: 'center',
-    paddingHorizontal: 20,
+    marginBottom: Space.sm,
   },
   progressContainer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+    gap: Space.sm,
+  },
+  progressText: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  progressRule: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    gap: Space.xs,
   },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.border,
   },
-  progressDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.textMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotActive: {
-    borderColor: Colors.tableTennis,
-    backgroundColor: Colors.tableTennis,
-  },
-  progressDotCompleted: {
-    backgroundColor: Colors.tableTennis,
-    borderColor: Colors.tableTennis,
-  },
-  progressLine: {
-    width: 16,
-    height: 2,
-    backgroundColor: Colors.textMuted,
-    marginHorizontal: 8,
-  },
-  progressLineActive: {
-    backgroundColor: Colors.tableTennis,
+  progressSegmentDone: {
+    backgroundColor: Colors.ink,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  stepContainer: {
-    marginBottom: 20,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xxxl,
   },
   stepTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: Space.sm,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.text,
-    marginBottom: 8,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
   },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  optionsRow: {
+  chipRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    flexWrap: 'wrap',
+    gap: Space.sm,
   },
-  optionChip: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+  chip: {
+    minHeight: Touch,
+    paddingHorizontal: Space.sm,
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
     borderColor: Colors.border,
-    marginHorizontal: 4,
+  },
+  chipWide: {
+    flex: 1,
     alignItems: 'center',
   },
-  optionChipWide: {
+  chipSelected: {
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.ink,
+  },
+  chipText: {
+    ...Type.bodyStrong,
+    color: Colors.textSecondary,
+  },
+  chipTextSelected: {
+    color: Colors.onHighlight,
+  },
+  list: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+    backgroundColor: Colors.card,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
+  rowSelected: {
+    backgroundColor: Colors.highlight,
+  },
+  rowText: {
+    ...Type.bodyStrong,
+    color: Colors.text,
     flex: 1,
   },
-  optionChipActive: {
-    backgroundColor: Colors.tableTennis,
-    borderColor: Colors.tableTennis,
+  rowTextSelected: {
+    color: Colors.onHighlight,
   },
-  optionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  optionTextActive: {
-    color: Colors.background,
-  },
-  optionsScrollView: {
-    marginBottom: 16,
-  },
-  optionsContent: {
-    paddingRight: 20,
-  },
-  groundChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-  },
-  groundChipActive: {
-    backgroundColor: Colors.tableTennis,
-    borderColor: Colors.tableTennis,
-  },
-  groundText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  groundTextActive: {
-    color: Colors.background,
-  },
-  playerSection: {
-    marginBottom: 20,
-  },
-  playerChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-  },
-  playerChipActive: {
-    backgroundColor: Colors.tableTennis,
-    borderColor: Colors.tableTennis,
-  },
-  playerChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  playerChipTextActive: {
-    color: Colors.background,
+  disabled: {
+    opacity: 0.4,
   },
   footer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.md,
+    backgroundColor: Colors.surface,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  footerRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
+    gap: Space.md,
   },
   button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    height: Touch,
+    borderRadius: Radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.tableTennis,
+    justifyContent: 'center',
+    paddingHorizontal: Space.lg,
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.background,
-  },
-  cancelButton: {
-    backgroundColor: Colors.border,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
+  secondaryBtnText: {
+    ...Type.headline,
     color: Colors.text,
+  },
+  primaryBtn: {
+    flex: 2,
+    backgroundColor: Colors.primary,
+  },
+  equalBtn: {
+    flex: 1,
+    paddingHorizontal: Space.sm,
+  },
+  primaryBtnText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
 });
