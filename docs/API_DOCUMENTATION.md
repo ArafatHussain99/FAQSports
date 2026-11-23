@@ -61,7 +61,7 @@ The client is created with default options: no `auth.storage`, so see [AUTHENTIC
 | `uploadPlayerStats(stats)` | `api/playerApi.ts` | `player_stats` insert | `void` | Teams tab | Only if RLS is off (R5); best bowling stored as text (D6) |
 | `updatePlayerTeam(playerId, teamId \| null)` | `api/playerApi.ts` | `players` update `team_id`, returns updated ids | `void` (throws if 0 rows changed) | Teams tab (Change Team) | Only if RLS is off on `players` or an UPDATE policy is added (none exists, D18) |
 | `updatePlayerProfile(playerId, { nickname, coverImageKey })` | `api/playerApi.ts` | `players` update `nickname`, `cover_image_key` | `void` (throws if 0 rows; explains a missing-column error) | Player profile (Edit) | Needs migrations `20261119000100` and `20261119000200` |
-| `deletePlayerInfo(playerId)` | `api/playerApi.ts` | `players` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted; `players` has no delete policy yet, so today it always throws (D18) |
+| `deletePlayerInfo(playerId)` | `api/playerApi.ts` | `players` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted. Works for admins once migration `20261125000000` (admin delete policy) is applied; cascades remove the player's stats, scorecard rows and `player_match_stats` |
 | `getGrounds()` | `api/groundApi.ts` | `grounds` select `name` | `string[]` | `DataProvider`, Manage Stadiums | Yes; doesn't return `id` (D5) |
 | `addGround(name, location?)` | `api/groundApi.ts` | `grounds` insert | `void` | Manage Stadiums | Yes for any signed-in user (R2); duplicate name fails (D13) |
 | `getMatches()` | `sports/cricket/api.ts` | `matches` select | raw rows | **never** | Runs; logs `row.name`, which doesn't exist |

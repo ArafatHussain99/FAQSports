@@ -307,7 +307,8 @@ What this means:
 | `notifications` | own | own | own | — |
 | `teams` | everyone | any signed-in user | — | **one hard-coded user ID only** |
 | `grounds` | everyone (two duplicate policies) | any signed-in user | — | — |
-| `players`, `player_stats`, `player_ratings` | everyone | — | — | — |
+| `players` | everyone | — | admins (`20261119000100`) | admins — migration `20261125000000`, **not applied yet** |
+| `player_stats`, `player_ratings` | everyone | — | — | — (rows go with the player through cascades) |
 | `matches`, `match_squads`, `innings`, `innings_extras`, `batting_scorecards`, `bowling_scorecards`, `fall_of_wickets`, `ball_events` | everyone | — | — | — |
 | `tournaments`, `tournament_teams` | everyone | — | — | — |
 | `player_performances` | no policy | — | — | — |
