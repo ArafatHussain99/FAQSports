@@ -1,7 +1,7 @@
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { Player, Team } from '@/types';
+import { Player, Team, TeamSport } from '@/types';
 import { TypePlayerInfo } from '@/types/player';
 import { useRouter } from 'expo-router';
 import { Archive, Check, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
@@ -25,6 +25,16 @@ import { deletePlayerInfo, updatePlayerTeam, uploadPlayerInfo, uploadPlayerStats
 import { archiveTeam, restoreTeam, uploadTeamInfo } from '@/api/teamApi';
 
 type TabType = 'teams' | 'players';
+
+// Cricket and football have separate teams; a player can be in one of each.
+const TEAM_SPORTS: { key: TeamSport; label: string; color: string }[] = [
+  { key: 'cricket', label: 'Cricket', color: Colors.cricket },
+  { key: 'football', label: 'Football', color: Colors.football },
+];
+const sportLabel = (sport: TeamSport) => (sport === 'football' ? 'Football' : 'Cricket');
+// The player's team for one sport: teamId is cricket, footballTeamId is football.
+const playerTeamId = (player: Player, sport: TeamSport) =>
+  sport === 'football' ? player.footballTeamId : player.teamId;
 type ModalType = 'addPlayer' | 'editPlayerTeam' | 'addTeam' | null;
 
 // Team colour presets, drawn from the sport pin tokens.
@@ -133,9 +143,13 @@ function SwipeableCard({ children, onDelete, isAdmin, ruled, action = 'delete' }
 
 export default function TeamsScreen() {
   const router = useRouter();
-  const { isAdmin, runWithGlobalLoading } = useApp();
-  const { teams, archivedTeams, allTeams, players, getTeamPlayers, refetchTeams, refetchPlayers } = useData();
+  const { isAdmin, runWithGlobalLoading, currentSport } = useApp();
+  const { teams: activeTeams, archivedTeams: allArchivedTeams, allTeams, players, getTeamPlayers, refetchTeams, refetchPlayers } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('teams');
+  // Which sport's teams are shown, assigned and created. Starts on the sport picked on Home.
+  const [teamSport, setTeamSport] = useState<TeamSport>(currentSport === 'football' ? 'football' : 'cricket');
+  const teams = activeTeams.filter(t => t.sport === teamSport);
+  const archivedTeams = allArchivedTeams.filter(t => t.sport === teamSport);
   const [showArchived, setShowArchived] = useState(false);
   const [restoringTeamId, setRestoringTeamId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -146,12 +160,13 @@ export default function TeamsScreen() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isSavingTeam, setIsSavingTeam] = useState(false);
   const [changeTeamError, setChangeTeamError] = useState<string | null>(null);
-  const teamChanged = (editingPlayer?.teamId ?? null) !== selectedTeamId;
+  const teamChanged = (editingPlayer ? playerTeamId(editingPlayer, teamSport) ?? null : null) !== selectedTeamId;
 
   // Add Player Form State
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerPosition, setNewPlayerPosition] = useState('');
   const [newPlayerTeamId, setNewPlayerTeamId] = useState<string>('');
+  const [newPlayerFootballTeamId, setNewPlayerFootballTeamId] = useState<string>('');
   const [newPlayerBatting, setNewPlayerBatting] = useState('right');
   const [newPlayerBowling, setNewPlayerBowling] = useState('');
   const [isSavingPlayer, setIsSavingPlayer] = useState(false);
@@ -160,6 +175,7 @@ export default function TeamsScreen() {
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamShortName, setNewTeamShortName] = useState('');
   const [newTeamColor, setNewTeamColor] = useState(DEFAULT_TEAM_COLOR);
+  const [newTeamSport, setNewTeamSport] = useState<TeamSport>(teamSport);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -180,6 +196,8 @@ export default function TeamsScreen() {
     const newPlayer: TypePlayerInfo = {
       name,
       team_id: newPlayerTeamId || null,
+      // Only sent when set, so adding a player still works before migration 20261127000000.
+      ...(newPlayerFootballTeamId ? { football_team_id: newPlayerFootballTeamId } : {}),
       position: newPlayerPosition.trim() || null,
       batting_style: newPlayerBatting || null,
       bowling_style: newPlayerBowling.trim() || null,
@@ -215,6 +233,7 @@ export default function TeamsScreen() {
       setNewPlayerName('');
       setNewPlayerPosition('');
       setNewPlayerTeamId('');
+      setNewPlayerFootballTeamId('');
       setNewPlayerBatting('right');
       setNewPlayerBowling('');
       setEditingPlayer(null);
@@ -240,6 +259,7 @@ export default function TeamsScreen() {
       return;
     }
 
+    const sport = newTeamSport;
     setNewTeamName('');
     setNewTeamShortName('');
     setNewTeamColor(DEFAULT_TEAM_COLOR);
@@ -251,12 +271,15 @@ export default function TeamsScreen() {
           name: teamName,
           short_name: teamShortName,
           color: newTeamColor,
+          sport,
         });
 
         await Promise.all([refetchTeams(), refetchPlayers()]);
       }, 'Saving team...');
 
-      Alert.alert('Success', `Team ${teamName} added successfully!`);
+      // Show the list the new team is in.
+      setTeamSport(sport);
+      Alert.alert('Success', `${sportLabel(sport)} team ${teamName} added successfully!`);
     } catch (error) {
       console.error('Error adding team:', error);
       Alert.alert('Error', 'Failed to add team. Please try again.');
@@ -342,7 +365,7 @@ export default function TeamsScreen() {
 
   const openChangeTeam = (player: Player) => {
     setEditingPlayer(player);
-    setSelectedTeamId(player.teamId ?? null);
+    setSelectedTeamId(playerTeamId(player, teamSport) ?? null);
     setChangeTeamError(null);
     setModalType('editPlayerTeam');
   };
@@ -361,7 +384,7 @@ export default function TeamsScreen() {
     setChangeTeamError(null);
     try {
       await runWithGlobalLoading(async () => {
-        await updatePlayerTeam(editingPlayer.id, selectedTeamId);
+        await updatePlayerTeam(editingPlayer.id, selectedTeamId, teamSport);
         await refetchPlayers();
       }, 'Updating team...');
       setModalType(null);
@@ -394,6 +417,44 @@ export default function TeamsScreen() {
     </View>
   );
 
+  // "Cricket team" / "Football team" chips in the Add player form.
+  const renderTeamPicker = (sport: TeamSport, value: string, onChange: (id: string) => void) => (
+    <View style={styles.formGroup}>
+      <Text style={styles.label}>{sportLabel(sport)} team (optional)</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
+        contentContainerStyle={styles.chipScrollContent}
+      >
+        <TouchableOpacity
+          style={[styles.option, !value && styles.optionSelected]}
+          onPress={() => onChange('')}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: !value }}
+          accessibilityLabel={`No ${sport} team`}
+        >
+          <Text style={[styles.optionText, !value && styles.optionTextSelected]}>No team</Text>
+        </TouchableOpacity>
+        {activeTeams.filter(t => t.sport === sport).map(team => {
+          const selected = value === team.id;
+          return (
+            <TouchableOpacity
+              key={team.id}
+              style={[styles.option, styles.optionWithPin, selected && styles.optionSelected]}
+              onPress={() => onChange(team.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+            >
+              <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
+              <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{team.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: 'teams', label: 'Teams', count: teams.length },
     { key: 'players', label: 'Players', count: players.length },
@@ -407,7 +468,14 @@ export default function TeamsScreen() {
           {isAdmin && (
             <TouchableOpacity
               style={styles.addBtn}
-              onPress={() => setModalType(activeTab === 'teams' ? 'addTeam' : 'addPlayer')}
+              onPress={() => {
+                if (activeTab === 'teams') {
+                  setNewTeamSport(teamSport);
+                  setModalType('addTeam');
+                } else {
+                  setModalType('addPlayer');
+                }
+              }}
               accessibilityRole="button"
               accessibilityLabel={activeTab === 'teams' ? 'Add team' : 'Add player'}
             >
@@ -438,6 +506,25 @@ export default function TeamsScreen() {
             );
           })}
         </View>
+
+        <View style={styles.sportRow} accessibilityRole="radiogroup" accessibilityLabel="Sport">
+          {TEAM_SPORTS.map(s => {
+            const selected = teamSport === s.key;
+            return (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.sportChip, selected && styles.optionSelected]}
+                onPress={() => setTeamSport(s.key)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${s.label} teams`}
+              >
+                <View style={[styles.pin, { backgroundColor: s.color }]} />
+                <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </SafeAreaView>
 
       <ScrollView
@@ -450,7 +537,7 @@ export default function TeamsScreen() {
       >
         {activeTab === 'teams' && teams.length === 0 &&
           renderEmpty(
-            'No teams yet',
+            `No ${teamSport} teams yet`,
             isAdmin ? 'Tap + to add one.' : 'Ask an admin to add a team. Pull down to refresh.'
           )}
 
@@ -572,7 +659,9 @@ export default function TeamsScreen() {
         {activeTab === 'players' && players.length > 0 && (
           <View style={styles.group}>
             {players.map((player, index) => {
-              const team = getTeam(player.teamId);
+              const currentTeamId = playerTeamId(player, teamSport);
+              const team = getTeam(currentTeamId);
+              const isFootball = teamSport === 'football';
               return (
                 <SwipeableCard
                   key={player.id}
@@ -592,7 +681,7 @@ export default function TeamsScreen() {
                     <View style={styles.rowText}>
                       <Text style={styles.rowTitle} numberOfLines={1}>{player.name}</Text>
                       <View style={styles.playerMeta}>
-                        {player.teamId ? (
+                        {currentTeamId ? (
                           <>
                             <View style={[styles.pin, { backgroundColor: team?.color || Colors.ink }]} />
                             <Text style={styles.rowSubtitle} numberOfLines={1}>
@@ -600,7 +689,7 @@ export default function TeamsScreen() {
                             </Text>
                           </>
                         ) : (
-                          <Text style={styles.rowSubtitleMuted} numberOfLines={1}>No team</Text>
+                          <Text style={styles.rowSubtitleMuted} numberOfLines={1}>No {teamSport} team</Text>
                         )}
                         <Text style={styles.rowSubtitleMuted} numberOfLines={1}>
                           {' · '}{player.position || 'Player'}
@@ -608,12 +697,12 @@ export default function TeamsScreen() {
                       </View>
                     </View>
                     <View style={styles.stat}>
-                      <Text style={styles.number}>{player.stats.runs}</Text>
-                      <Text style={styles.statLabel}>Runs</Text>
+                      <Text style={styles.number}>{isFootball ? player.stats.goals ?? 0 : player.stats.runs}</Text>
+                      <Text style={styles.statLabel}>{isFootball ? 'Goals' : 'Runs'}</Text>
                     </View>
                     <View style={styles.stat}>
-                      <Text style={styles.number}>{player.stats.wickets}</Text>
-                      <Text style={styles.statLabel}>Wkts</Text>
+                      <Text style={styles.number}>{isFootball ? player.stats.assists ?? 0 : player.stats.wickets}</Text>
+                      <Text style={styles.statLabel}>{isFootball ? 'Ast' : 'Wkts'}</Text>
                     </View>
                   </TouchableOpacity>
                   {isAdmin && (
@@ -622,9 +711,9 @@ export default function TeamsScreen() {
                       onPress={() => openChangeTeam(player)}
                       hitSlop={{ top: 8, bottom: 8 }}
                       accessibilityRole="button"
-                      accessibilityLabel={`Change team for ${player.name}`}
+                      accessibilityLabel={`Change ${teamSport} team for ${player.name}`}
                     >
-                      <Text style={styles.changeTeamText}>Change team</Text>
+                      <Text style={styles.changeTeamText}>Change {teamSport} team</Text>
                     </TouchableOpacity>
                   )}
                 </SwipeableCard>
@@ -697,43 +786,8 @@ export default function TeamsScreen() {
                 />
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Team (optional)</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.chipScroll}
-                  contentContainerStyle={styles.chipScrollContent}
-                >
-                  <TouchableOpacity
-                    style={[styles.option, !newPlayerTeamId && styles.optionSelected]}
-                    onPress={() => setNewPlayerTeamId('')}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: !newPlayerTeamId }}
-                  >
-                    <Text style={[styles.optionText, !newPlayerTeamId && styles.optionTextSelected]}>
-                      No team
-                    </Text>
-                  </TouchableOpacity>
-                  {teams.map(team => {
-                    const selected = newPlayerTeamId === team.id;
-                    return (
-                      <TouchableOpacity
-                        key={team.id}
-                        style={[styles.option, styles.optionWithPin, selected && styles.optionSelected]}
-                        onPress={() => setNewPlayerTeamId(team.id)}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                      >
-                        <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
-                        <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
-                          {team.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+              {renderTeamPicker('cricket', newPlayerTeamId, setNewPlayerTeamId)}
+              {renderTeamPicker('football', newPlayerFootballTeamId, setNewPlayerFootballTeamId)}
             </ScrollView>
 
             <View style={styles.sheetFooter}>
@@ -768,7 +822,7 @@ export default function TeamsScreen() {
           <SafeAreaView edges={['bottom']} style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle} numberOfLines={2}>
-              Change team for {editingPlayer?.name}
+              Change {teamSport} team for {editingPlayer?.name}
             </Text>
 
             <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent}>
@@ -841,9 +895,30 @@ export default function TeamsScreen() {
         <View style={styles.scrim}>
           <SafeAreaView edges={['bottom']} style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add team</Text>
+            <Text style={styles.sheetTitle}>Add {newTeamSport} team</Text>
 
             <ScrollView style={styles.sheetBody} contentContainerStyle={styles.sheetBodyContent}>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Sport *</Text>
+                <View style={styles.optionRow}>
+                  {TEAM_SPORTS.map(s => {
+                    const selected = newTeamSport === s.key;
+                    return (
+                      <TouchableOpacity
+                        key={s.key}
+                        style={[styles.option, styles.optionFlex, styles.optionWithPin, selected && styles.optionSelected]}
+                        onPress={() => setNewTeamSport(s.key)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                      >
+                        <View style={[styles.pin, { backgroundColor: s.color }]} />
+                        <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{s.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Team name *</Text>
                 <TextInput
@@ -971,6 +1046,23 @@ const styles = StyleSheet.create({
   segmentCount: {
     fontVariant: ['tabular-nums'],
     color: Colors.textMuted,
+  },
+  sportRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+  },
+  sportChip: {
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
   },
   scrollView: {
     flex: 1,

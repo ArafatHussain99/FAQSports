@@ -16,7 +16,8 @@ const STEPS: Step[] = ['basics', 'teams', 'toss', 'players'];
 
 export default function CreateMatchScreen() {
   const router = useRouter();
-  const { teams, players, getTeamPlayers, getTeamById, grounds } = useData();
+  const { getTeamsForSport, players, getTeamPlayers, getTeamById, grounds } = useData();
+  const teams = getTeamsForSport('cricket');
   const { setUpcomingMatches, setCurrentMatch } = useCricketMatches();
 
   const [step, setStep] = useState<Step>('basics');

@@ -1,4 +1,4 @@
-import { Player } from "@/types";
+import { Player, TeamSport } from "@/types";
 import { TypePlayerInfo, TypePlayerStats } from "@/types/player";
 import { supabase } from "./supabaseClient";
 
@@ -24,13 +24,20 @@ export const uploadPlayerStats = async (playerStats: TypePlayerStats) => {
   }
 }
 
-// Move a player to another team, or to no team (teamId = null).
+// Move a player to another team of `sport`, or to no team (teamId = null).
+// A player has one cricket team (team_id) and one football team
+// (football_team_id, migration 20261127000000).
 // `.select('id')` returns the updated rows: an update blocked by RLS doesn't
 // error, it just changes 0 rows, so an empty result is treated as a failure.
-export const updatePlayerTeam = async (playerId: string, teamId: string | null): Promise<void> => {
+export const updatePlayerTeam = async (
+  playerId: string,
+  teamId: string | null,
+  sport: TeamSport = 'cricket'
+): Promise<void> => {
+  const column = sport === 'football' ? 'football_team_id' : 'team_id';
   const { data, error } = await supabase
     .from('players')
-    .update({ team_id: teamId })
+    .update({ [column]: teamId })
     .eq('id', playerId)
     .select('id');
 
@@ -103,6 +110,7 @@ type PlayerRecord = {
   nickname?: string | null;        // added by migration 20261119000200
   cover_image_key?: string | null; // added by migration 20261119000200
   team_id: string | null;
+  football_team_id?: string | null; // added by migration 20261127000000
   position: string | null;
   batting_style: string | null;
   bowling_style: string | null;
@@ -129,7 +137,7 @@ type PlayerRecord = {
   best_bowling_runs?: number | string | null;
 };
 
-type StatsColumns = Omit<PlayerRecord, 'id' | 'name' | 'nickname' | 'cover_image_key' | 'team_id' | 'position' | 'batting_style' | 'bowling_style'>;
+type StatsColumns = Omit<PlayerRecord, 'id' | 'name' | 'nickname' | 'cover_image_key' | 'team_id' | 'football_team_id' | 'position' | 'batting_style' | 'bowling_style'>;
 
 // players joined with player_stats (one row per player). PostgREST returns the
 // embedded row as an object or a one-item array depending on the relationship.
@@ -149,6 +157,7 @@ const mapPlayerRecord = (row: PlayerRow): Player => {
     nickname: player.nickname ?? undefined,
     coverImageKey: player.cover_image_key ?? undefined,
     teamId: player.team_id ?? undefined,
+    footballTeamId: player.football_team_id ?? undefined,
     position: player.position ?? undefined,
     battingStyle: player.batting_style as Player['battingStyle'],
     bowlingStyle: player.bowling_style ?? undefined,

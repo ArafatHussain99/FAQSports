@@ -147,6 +147,7 @@ These business rules can't be decided from the code. Answers should be recorded 
 19. **LBW:** the database supports it as a dismissal; the app doesn't offer it. Add it?
 20. **Cancelled vs abandoned:** the database calls it `abandoned`, the app `cancelled`. Which word?
 21. **Signed-out access:** most data is readable without signing in. Should it require sign-in?
+22. ~~**Cricket vs football teams**~~ — **Decided 2026-11-23:** teams belong to one sport (cricket or football). A player can be in one cricket team and one football team at the same time. All teams that existed before are cricket teams. The Teams tab has a Cricket / Football switch; match creation and awards only offer that sport's teams. Migration `20261127000000`.
 
 ## 8. Undocumented assumptions found in code
 
@@ -155,7 +156,7 @@ These business rules can't be decided from the code. Answers should be recorded 
 | The team batting first is always stored as `teamA`. The create screen swaps teams so this holds, and the innings engine depends on it. | `CreateMatchScreen.tsx` `handleCreateMatch`, `inningsEngine.ts` |
 | A cricket match has exactly two innings. | `CricketMatch.currentInnings: 1 \| 2` |
 | An over is always 6 legal balls. | `scoreEngine.ts:70` |
-| Every player belongs to at most one team. | `players.team_id` |
+| Every player belongs to at most one cricket team and one football team. | `players.team_id`, `players.football_team_id` |
 | The user's display name is the part of their email before `@`. | `login.tsx:52` |
 | Email addresses are compared in lower case; `profiles.email` must also be lower case. | `login.tsx:41-44` |
 | Grounds are referenced by name, not ID. (Names are unique in the database, but matches store `ground_id`.) | `getGrounds` returns names only |

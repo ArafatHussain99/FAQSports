@@ -92,7 +92,8 @@ export default function PlayerProfileScreen() {
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const player = getPlayerById(id || '');
-  const team = player?.teamId ? getTeamById(player.teamId) : null;
+  const cricketTeam = player?.teamId ? getTeamById(player.teamId) : null;
+  const footballTeam = player?.footballTeamId ? getTeamById(player.footballTeamId) : null;
   const cover = getPlayerCover(player?.coverImageKey);
 
   if (!player) {
@@ -222,6 +223,8 @@ export default function PlayerProfileScreen() {
 
   // Teams played for in the selected sport. Totals stay with the team the
   // player was in at the time, even after they leave it.
+  // Current team for the selected sport (table tennis keeps using team_id).
+  const team = selectedSport === 'football' ? footballTeam : cricketTeam;
   const allSpells = matchStatsQuery.data ? groupByTeam(matchStatsQuery.data) : [];
   const spells = allSpells.filter((spell) => spell.sport === selectedSport);
   if (matchStatsQuery.data && team && !allSpells.some((spell) => spell.teamId === team.id)) {
@@ -292,11 +295,14 @@ export default function PlayerProfileScreen() {
             {player.nickname && (
               <Text style={styles.playerNickname}>&ldquo;{player.nickname}&rdquo;</Text>
             )}
-            {team && (
-              <View style={styles.teamRow}>
-                <View style={[styles.teamPin, { backgroundColor: team.color }]} />
-                <Text style={styles.teamName}>{team.name}</Text>
-              </View>
+            {[cricketTeam, footballTeam].map((t) =>
+              t ? (
+                <View key={t.id} style={styles.teamRow}>
+                  <View style={[styles.teamPin, { backgroundColor: t.color }]} />
+                  <Text style={styles.teamName}>{t.name}</Text>
+                  <Text style={styles.teamSport}>{t.sport === 'football' ? 'Football' : 'Cricket'}</Text>
+                </View>
+              ) : null
             )}
             <View style={styles.roleRow}>
               <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
@@ -722,6 +728,10 @@ const styles = StyleSheet.create({
   teamName: {
     ...Type.bodyStrong,
     color: Colors.text,
+  },
+  teamSport: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
   },
   roleRow: {
     alignSelf: 'stretch',

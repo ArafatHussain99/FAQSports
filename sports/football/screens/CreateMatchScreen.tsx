@@ -22,7 +22,8 @@ export const footballMatchFormats: { key: FootballMatchFormat; label: string }[]
 
 export default function CreateFootballMatchScreen() {
   const router = useRouter();
-  const { teams, getTeamPlayers } = useData();
+  const { getTeamsForSport, getTeamPlayers } = useData();
+  const teams = getTeamsForSport('football');
   const { setUpcomingMatches, setCurrentMatch } = useFootballMatches();
 
   const [step, setStep] = useState<Step>('basics');

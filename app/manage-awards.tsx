@@ -215,7 +215,9 @@ export default function ManageAwardsScreen() {
     const canSavePair = pair.length === 2 && !sameAsOther(pair) && !saving;
 
     const options = teamSport
-      ? teams.map((t) => ({ id: t.id, name: t.name, color: t.color }))
+      ? teams
+          .filter((t) => t.sport === sport)
+          .map((t) => ({ id: t.id, name: t.name, color: t.color }))
       : filteredPlayers.map((p) => ({ id: p.id, name: p.name, color: undefined as string | undefined }));
 
     return (
@@ -239,7 +241,7 @@ export default function ManageAwardsScreen() {
         )}
         {options.length === 0 ? (
           <Text style={styles.pickerEmpty}>
-            {teamSport ? 'No active teams yet.' : search.trim() ? 'No players match.' : 'No players yet.'}
+            {teamSport ? `No active ${sport} teams yet.` : search.trim() ? 'No players match.' : 'No players yet.'}
           </Text>
         ) : (
           <View style={styles.optionList}>

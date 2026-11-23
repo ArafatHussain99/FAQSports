@@ -49,6 +49,8 @@ export const getTeams = async (): Promise<Team[]> => {
     id: team.id,
     name: team.name,
     shortName: team.short_name || '',
+    // Teams created before migration 20261127000000 are cricket teams.
+    sport: team.sport === 'football' ? 'football' : 'cricket',
     color: team.color || DEFAULT_TEAM_COLOR,
     logo: team.logo_url,
     players: [], // Will be populated separately

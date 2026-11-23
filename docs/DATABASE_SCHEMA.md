@@ -112,7 +112,8 @@ The database layout mirrors the app's in-memory `CricketMatch` type, split into 
 
 | Column | Type | Null | Notes |
 |--------|------|------|-------|
-| `name` | text | no, **unique** | A duplicate name fails with Postgres error `23505` |
+| `name` | text | no, **unique** | A duplicate name fails with Postgres error `23505`. Migration `20261127000000` (**not applied yet**) makes it unique per sport: `unique (sport, name)` |
+| `sport` | text `cricket` \| `football` | no, default `cricket` | **Pending** migration `20261127000000`. Existing teams become cricket teams. Can't change while players are assigned (trigger) |
 | `short_name` | text | yes | |
 | `color` | text | yes | Must match `#RGB` or `#RRGGBB` (check constraint) |
 | `logo_url` | text | yes | |
@@ -124,7 +125,8 @@ The database layout mirrors the app's in-memory `CricketMatch` type, split into 
 | Column | Type | Null | Notes |
 |--------|------|------|-------|
 | `name` | text | no | |
-| `team_id` | uuid → `teams` | yes | |
+| `team_id` | uuid → `teams` | yes | The **cricket** team. From migration `20261127000000` a trigger rejects a non-cricket team |
+| `football_team_id` | uuid → `teams` | yes | **Pending** migration `20261127000000`. The football team; a trigger rejects a non-football team |
 | `position` | enum `player_position`: `Batsman`, `Bowler`, `All-rounder`, `Wicketkeeper` | yes | Case-sensitive. The Add Player form accepts free text, so anything else ("batsman", "Wicket Keeper", "Captain") makes the insert fail |
 | `batting_style` | text | yes | App sends `'right'` / `'left'` |
 | `bowling_style` | text | yes | |
@@ -329,6 +331,8 @@ Findings:
 **R1 fix:** [`supabase/migrations/20261119000000_lock_profile_role.sql`](../supabase/migrations/20261119000000_lock_profile_role.sql) restricts `role` to `admin`/`player` and removes users' ability to set it (column-level grants). Written 2026-11-19, **not applied yet**; it includes pre-checks, verification and rollback.
 
 **Player nickname and cover:** [`supabase/migrations/20261119000200_players_nickname_cover.sql`](../supabase/migrations/20261119000200_players_nickname_cover.sql) adds `players.nickname` and `players.cover_image_key`. Written 2026-11-19, **not applied yet**; needs the two migrations below/above first.
+
+**Cricket and football teams:** [`supabase/migrations/20261127000000_team_sport.sql`](../supabase/migrations/20261127000000_team_sport.sql) adds `teams.sport`, `players.football_team_id`, sport-check triggers, and updates `archive_team()` and `set_sport_award()` to handle both columns. Written 2026-11-23, **not applied yet**; until it is, every team loads as a cricket team and assigning a football team fails.
 
 **Players update:** [`supabase/migrations/20261119000100_players_admin_update.sql`](../supabase/migrations/20261119000100_players_admin_update.sql) adds `public.is_admin()` and an admin-only UPDATE policy on `players` (needed by Change Team). Written 2026-11-19, **not applied yet**; apply the role-lock migration first.
 

@@ -59,7 +59,7 @@ The client is created with default options: no `auth.storage`, so see [AUTHENTIC
 | `setSportAward(sport, category, place, target)` / `clearSportAward(sport, category, place)` | `api/statsApi.ts` | RPCs `set_sport_award` / `clear_sport_award` (5- and 3-argument forms) | `void` | Champions (admin) | Admins only. `category` is `main`, or `singles` / `doubles` for table tennis; target is `{ teamId }` or `{ playerIds }` (1 for singles, 2 for doubles). A team award snapshots the team's current players. Needs migration `20261126000000` |
 | `uploadPlayerInfo(info)` | `api/playerApi.ts` | `players` insert, returns id | `string` | Teams tab | Fails if `position` isn't an exact enum value (D3); no insert policy (R5) |
 | `uploadPlayerStats(stats)` | `api/playerApi.ts` | `player_stats` insert | `void` | Teams tab | Only if RLS is off (R5); best bowling stored as text (D6) |
-| `updatePlayerTeam(playerId, teamId \| null)` | `api/playerApi.ts` | `players` update `team_id`, returns updated ids | `void` (throws if 0 rows changed) | Teams tab (Change Team) | Only if RLS is off on `players` or an UPDATE policy is added (none exists, D18) |
+| `updatePlayerTeam(playerId, teamId \| null, sport = 'cricket')` | `api/playerApi.ts` | `players` update `team_id` (cricket) or `football_team_id` (football), returns updated ids | `void` (throws if 0 rows changed) | Teams tab (Change Team) | Only if RLS is off on `players` or an UPDATE policy is added (none exists, D18) |
 | `updatePlayerProfile(playerId, { nickname, coverImageKey })` | `api/playerApi.ts` | `players` update `nickname`, `cover_image_key` | `void` (throws if 0 rows; explains a missing-column error) | Player profile (Edit) | Needs migrations `20261119000100` and `20261119000200` |
 | `deletePlayerInfo(playerId)` | `api/playerApi.ts` | `players` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted. Works for admins once migration `20261125000000` (admin delete policy) is applied; cascades remove the player's stats, scorecard rows and `player_match_stats` |
 | `getGrounds()` | `api/groundApi.ts` | `grounds` select `name` | `string[]` | `DataProvider`, Manage Stadiums | Yes; doesn't return `id` (D5) |
@@ -210,7 +210,7 @@ POST /rest/v1/player_stats
 ### 4.5a Change a player's team
 
 ```ts
-await updatePlayerTeam(playerId, teamId); // teamId = null for "No Team"
+await updatePlayerTeam(playerId, teamId, 'football'); // teamId = null for "No Team"; sport defaults to 'cricket'
 ```
 
 ```http

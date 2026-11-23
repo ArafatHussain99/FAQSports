@@ -2,7 +2,7 @@ import { getGrounds } from '@/api/groundApi';
 import { getPlayers } from '@/api/playerApi';
 import { getTeams } from '@/api/teamApi';
 import { mockNotifications, mockPlayers, mockTeams } from '@/mocks/data';
-import { Notification, Player, SportType, Team, UserRole } from '@/types';
+import { Notification, Player, SportType, Team, TeamSport, UserRole } from '@/types';
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -192,9 +192,20 @@ export const [DataProvider, useData] = createContextHook(() => {
     return allTeams.find(t => t.id === id);
   }, [allTeams]);
 
+  // A player has a cricket team (teamId) and a football team (footballTeamId);
+  // match on the column for the team's sport.
   const getTeamPlayers = useCallback((teamId: string) => {
-    return players.filter(p => p.teamId === teamId);
+    if (!teamId) return [];
+    const team = teams.find(t => t.id === teamId);
+    return team?.sport === 'football'
+      ? players.filter(p => p.footballTeamId === teamId)
+      : players.filter(p => p.teamId === teamId);
   }, [teams, players]);
+
+  // Active teams of one sport, for pickers in that sport's screens.
+  const getTeamsForSport = useCallback((sport: TeamSport) => {
+    return activeTeams.filter(t => t.sport === sport);
+  }, [activeTeams]);
 
   const refetchTeams = useCallback(() => {
     return teamsQuery.refetch();
@@ -232,7 +243,11 @@ export const [DataProvider, useData] = createContextHook(() => {
     // Remove team from teams list
     setTeams(prev => prev.filter(t => t.id !== teamId));
     // Remove teamId from all players in that team
-    setPlayers(prev => prev.map(p => p.teamId === teamId ? { ...p, teamId: undefined } : p));
+    setPlayers(prev => prev.map(p => ({
+      ...p,
+      teamId: p.teamId === teamId ? undefined : p.teamId,
+      footballTeamId: p.footballTeamId === teamId ? undefined : p.footballTeamId,
+    })));
   }, []);
 
   const deletePlayer = useCallback((playerId: string) => {
@@ -250,6 +265,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     getPlayerById,
     getTeamById,
     getTeamPlayers,
+    getTeamsForSport,
     refetchTeams,
     refetchPlayers,
     markNotificationRead,

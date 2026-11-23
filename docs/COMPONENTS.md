@@ -120,7 +120,8 @@ await runWithGlobalLoading(async () => {
 | `grounds` | `string[]` | Ground names from Supabase |
 | `notifications`, `unreadCount` | | Mock data |
 | `getPlayerById(id)`, `getTeamById(id)` | lookup | |
-| `getTeamPlayers(teamId)` | `Player[]` | Filters `players` by `teamId` |
+| `getTeamPlayers(teamId)` | `Player[]` | Players in the team: by `footballTeamId` for a football team, `teamId` for a cricket team |
+| `getTeamsForSport(sport)` | `Team[]` | Active teams of `'cricket'` or `'football'`, for pickers |
 | `refetchTeams()`, `refetchPlayers()` | `Promise` | React Query refetch |
 | `markNotificationRead(id)` | | Memory only |
 | `addPlayer`, `updatePlayer`, `deletePlayer`, `addTeam`, `updateTeam`, `deleteTeam` | | Local-only mutators; **not used** by any screen |
@@ -169,7 +170,7 @@ Suggested home: a new top-level `components/` folder for shared UI (CLAUDE.md do
 |--------|------|--------------|------------|-------|
 | Home | `app/(tabs)/index.tsx` | — | `useApp`, `useData`, `useCricketMatches`, `useFootballMatches` | Login redirect, sport switcher, cards, top 3 players |
 | Matches | `app/(tabs)/matches.tsx` | — | `useApp`, `useCricketMatches` | Filter chips; `+` opens cricket create |
-| Teams | `app/(tabs)/teams.tsx` | — | `useApp`, `useData` | Teams/Players tabs, 3 modals (Change Team saves via `updatePlayerTeam`), `SwipeableCard` (height follows content) |
+| Teams | `app/(tabs)/teams.tsx` | — | `useApp`, `useData` | Teams/Players tabs with a Cricket/Football switch, 3 modals (Add team picks the sport; Add player picks a cricket and a football team; Change Team saves the selected sport's team via `updatePlayerTeam`), `SwipeableCard` (height follows content) |
 | Profile | `app/(tabs)/profile.tsx` | — | `useApp`, `useData` | Own stats (guessed), logout |
 | More | `app/(tabs)/more.tsx` | — | `useApp`, `useData` | Menu sections |
 | Login | `app/login.tsx` | — | `useApp` | Sign in / sign up |

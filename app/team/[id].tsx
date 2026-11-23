@@ -118,6 +118,7 @@ export default function TeamDetailScreen() {
               <Text style={styles.shortTagText}>{team.shortName}</Text>
             </View>
           </View>
+          <Text style={styles.sportLabel}>{team.sport === 'football' ? 'Football' : 'Cricket'} team</Text>
           {captain && (
             <TouchableOpacity
               style={styles.captainLink}
@@ -239,7 +240,8 @@ export default function TeamDetailScreen() {
             </View>
             {history.map(row => {
               const player = getPlayerById(row.playerId);
-              const isFormer = player?.teamId !== team.id;
+              const isFormer =
+                (team.sport === 'football' ? player?.footballTeamId : player?.teamId) !== team.id;
               const name = player?.name ?? 'Unknown player';
               return (
                 <TouchableOpacity
@@ -357,6 +359,11 @@ const styles = StyleSheet.create({
   shortTagText: {
     ...Type.tag,
     color: Colors.ink,
+  },
+  sportLabel: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    marginTop: Space.xs,
   },
   captainLink: {
     flexDirection: 'row',

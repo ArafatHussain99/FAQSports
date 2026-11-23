@@ -2,6 +2,9 @@ export type UserRole = 'admin' | 'player';
 
 export type SportType = 'cricket' | 'football' | 'table_tennis' | 'badminton' | 'carrom' | 'uno';
 
+/** Sports that have teams. Each team belongs to exactly one. */
+export type TeamSport = 'cricket' | 'football';
+
 export type MatchStatus = 'upcoming' | 'live' | 'completed' | 'cancelled';
 
 export interface User {
@@ -20,7 +23,10 @@ export interface Player {
   /** Key of a bundled cover picture (constants/playerCovers.ts), not a URL. */
   coverImageKey?: string;
   avatar?: string;
+  /** Cricket team (players.team_id). */
   teamId?: string;
+  /** Football team (players.football_team_id). */
+  footballTeamId?: string;
   position?: string;
   battingStyle?: 'right' | 'left';
   bowlingStyle?: string;
@@ -84,6 +90,7 @@ export interface Team {
   id: string;
   name: string;
   shortName: string;
+  sport: TeamSport;
   logo?: string;
   color: string;
   players: string[];

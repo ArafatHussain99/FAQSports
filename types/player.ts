@@ -1,6 +1,8 @@
 export type TypePlayerInfo = {
   name: string;
+  /** Cricket team. */
   team_id: string | null;
+  football_team_id?: string | null;
   position: string | null;
   batting_style: string | null;
   bowling_style: string | null;
