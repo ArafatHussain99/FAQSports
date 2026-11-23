@@ -4,7 +4,7 @@ import Colors from '@/constants/colors';
 import { getPlayerCover, PLAYER_COVERS } from '@/constants/playerCovers';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { STAT_SPORT_LABELS, useSportAwards } from '@/hooks/useSportAwards';
+import { STAT_SPORT_LABELS, awardLabel, useSportAwards } from '@/hooks/useSportAwards';
 import { Comment, PerformanceSummary, SportType } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -263,10 +263,10 @@ export default function PlayerProfileScreen() {
               <Text style={styles.playerName}>{player.name}</Text>
               {awards.map((award) => (
                 <Trophy
-                  key={`${award.sport}-${award.place}`}
+                  key={`${award.sport}-${award.category}-${award.place}`}
                   size={22}
                   color={award.place === 1 ? Colors.gold : Colors.silver}
-                  accessibilityLabel={`${STAT_SPORT_LABELS[award.sport]} ${award.place === 1 ? 'champion' : 'runner-up'}`}
+                  accessibilityLabel={awardLabel(award)}
                 />
               ))}
             </View>
@@ -274,10 +274,10 @@ export default function PlayerProfileScreen() {
               <View style={styles.awardRow}>
                 {awards.map((award) => {
                   const champion = award.place === 1;
-                  const label = `${STAT_SPORT_LABELS[award.sport]} ${champion ? 'champion' : 'runner-up'}`;
+                  const label = awardLabel(award);
                   return (
                     <View
-                      key={`${award.sport}-${award.place}`}
+                      key={`${award.sport}-${award.category}-${award.place}`}
                       style={[styles.awardTag, champion ? styles.awardTagGold : styles.awardTagSilver]}
                       accessible
                       accessibilityLabel={label}

@@ -22,8 +22,9 @@ function RootLayoutNav() {
       screenOptions={{
         headerBackTitle: "Back",
         headerStyle: { backgroundColor: Colors.surface },
-        headerShadowVisible: false,
-        headerBackground: () => <View style={styles.headerBackground} />,
+        // Native hairline under the header. A custom headerBackground makes the
+        // native-stack header overlay the screen, cutting off the top of content.
+        headerShadowVisible: true,
         headerTintColor: Colors.text,
         headerTitleStyle: { color: Colors.ink, fontSize: Type.headline.fontSize, fontWeight: Type.headline.fontWeight },
         contentStyle: { backgroundColor: Colors.background },
@@ -99,12 +100,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  headerBackground: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: Hairline,
-    borderBottomColor: Colors.border,
-  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',

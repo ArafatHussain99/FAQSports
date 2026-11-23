@@ -155,7 +155,7 @@ Migration `20261124000000`. Unique `(sport, match_id, player_id)`; `sport` is `c
 
 ### `sport_awards` and `sport_award_recipients`
 
-Migration `20261124000000`. Current champion (`place` 1) and runner-up (`place` 2) per sport, to a team or a player. Recipients are the players recognised, snapshotted when the award is set. Read: everyone. Write: `set_sport_award()` / `clear_sport_award()` (admins).
+Migration `20261124000000`. Current champion (`place` 1) and runner-up (`place` 2) per sport, to a team or a player. Recipients are the players recognised, snapshotted when the award is set. Migration `20261126000000` (**not applied yet**) adds `category`: `main` for cricket and football, `singles` / `doubles` for table tennis (a doubles award has two recipients); the key becomes `(sport, category, place)`. Read: everyone. Write: `set_sport_award()` / `clear_sport_award()` (admins).
 
 ### `player_ratings` (one row per player)
 

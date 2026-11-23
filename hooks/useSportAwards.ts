@@ -10,6 +10,12 @@ export const STAT_SPORT_LABELS: Record<StatSport, string> = {
   table_tennis: 'Table Tennis',
 };
 
+/** e.g. "Cricket champion", "Table Tennis doubles runner-up". */
+export const awardLabel = (award: Pick<SportAward, 'sport' | 'category' | 'place'>) => {
+  const category = award.category === 'main' ? '' : ` ${award.category}`;
+  return `${STAT_SPORT_LABELS[award.sport]}${category} ${award.place === 1 ? 'champion' : 'runner-up'}`;
+};
+
 /** Current champion / runner-up per sport, and a lookup for one player's awards. */
 export function useSportAwards() {
   const query = useQuery({

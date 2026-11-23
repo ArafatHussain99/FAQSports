@@ -168,20 +168,28 @@ export const totalsByPlayer = (rows: PlayerMatchStatRow[]): TeamPlayerTotals[] =
 
 export type AwardPlace = 1 | 2;
 
+/** 'main' for cricket and football; table tennis has 'singles' and 'doubles'. */
+export type AwardCategory = 'main' | 'singles' | 'doubles';
+
+export const awardCategoriesFor = (sport: StatSport): AwardCategory[] =>
+  sport === 'table_tennis' ? ['singles', 'doubles'] : ['main'];
+
 export type SportAward = {
   sport: StatSport;
+  category: AwardCategory;
   place: AwardPlace;
   teamId: string | null;
   playerId: string | null;
   awardedAt: string;
-  /** Players recognised: the squad at award time, or the single player. */
+  /** Players recognised: the squad at award time, or the singles player / doubles pair. */
   recipientIds: string[];
 };
 
+// Needs migration 20261126000000 (award categories) for `category`.
 export const getSportAwards = async (): Promise<SportAward[]> => {
   const [awardsRes, recipientsRes] = await Promise.all([
-    supabase.from('sport_awards').select('sport, place, team_id, player_id, awarded_at'),
-    supabase.from('sport_award_recipients').select('sport, place, player_id'),
+    supabase.from('sport_awards').select('sport, category, place, team_id, player_id, awarded_at'),
+    supabase.from('sport_award_recipients').select('sport, category, place, player_id'),
   ]);
   if (awardsRes.error) {
     console.error("Error fetching awards:", awardsRes.error);
@@ -194,27 +202,33 @@ export const getSportAwards = async (): Promise<SportAward[]> => {
   const recipients = recipientsRes.data ?? [];
   return (awardsRes.data ?? []).map((a) => ({
     sport: a.sport as StatSport,
+    category: (a.category ?? 'main') as AwardCategory,
     place: a.place as AwardPlace,
     teamId: a.team_id,
     playerId: a.player_id,
     awardedAt: a.awarded_at,
     recipientIds: recipients
-      .filter((r) => r.sport === a.sport && r.place === a.place)
+      .filter((r) => r.sport === a.sport && r.category === a.category && r.place === a.place)
       .map((r) => r.player_id as string),
   }));
 };
 
-/** Gives the award to a team (cricket, football) or a player (table tennis). Admins only. */
+/**
+ * Gives the award to a team (cricket, football) or to players (table tennis:
+ * one for singles, two for doubles). Admins only.
+ */
 export const setSportAward = async (
   sport: StatSport,
+  category: AwardCategory,
   place: AwardPlace,
-  target: { teamId: string } | { playerId: string }
+  target: { teamId: string } | { playerIds: string[] }
 ): Promise<void> => {
   const { error } = await supabase.rpc('set_sport_award', {
     p_sport: sport,
+    p_category: category,
     p_place: place,
     p_team_id: 'teamId' in target ? target.teamId : null,
-    p_player_id: 'playerId' in target ? target.playerId : null,
+    p_player_ids: 'playerIds' in target ? target.playerIds : null,
   });
   if (error) {
     console.error("Error setting award:", error);
@@ -222,8 +236,16 @@ export const setSportAward = async (
   }
 };
 
-export const clearSportAward = async (sport: StatSport, place: AwardPlace): Promise<void> => {
-  const { error } = await supabase.rpc('clear_sport_award', { p_sport: sport, p_place: place });
+export const clearSportAward = async (
+  sport: StatSport,
+  category: AwardCategory,
+  place: AwardPlace
+): Promise<void> => {
+  const { error } = await supabase.rpc('clear_sport_award', {
+    p_sport: sport,
+    p_category: category,
+    p_place: place,
+  });
   if (error) {
     console.error("Error clearing award:", error);
     throw error;

@@ -2,12 +2,20 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
-import { X, Search } from 'lucide-react-native';
+import { X, Search, Check } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { AwardPlace, SportAward, StatSport, clearSportAward, setSportAward } from '@/api/statsApi';
+import {
+  AwardCategory,
+  AwardPlace,
+  SportAward,
+  StatSport,
+  awardCategoriesFor,
+  clearSportAward,
+  setSportAward,
+} from '@/api/statsApi';
 import { SPORT_AWARDS_KEY, STAT_SPORT_LABELS, useSportAwards } from '@/hooks/useSportAwards';
 
 const SPORTS: StatSport[] = ['cricket', 'football', 'table_tennis'];
@@ -15,6 +23,7 @@ const PLACES: AwardPlace[] = [1, 2];
 
 const PLACE_LABEL: Record<AwardPlace, string> = { 1: 'Champion', 2: 'Runner-up' };
 const ALREADY_LABEL: Record<AwardPlace, string> = { 1: 'Already champion', 2: 'Already runner-up' };
+const CATEGORY_LABEL: Record<AwardCategory, string> = { main: '', singles: 'Singles', doubles: 'Doubles' };
 
 type Feedback = { kind: 'ok' | 'error'; text: string };
 
@@ -41,26 +50,35 @@ export default function ManageAwardsScreen() {
   const { awards, isPending: isLoading, isError, refetch } = useSportAwards();
 
   const [sport, setSport] = useState<StatSport>('cricket');
+  const [category, setCategory] = useState<AwardCategory>('main');
   const [picking, setPicking] = useState<AwardPlace | null>(null);
+  // Doubles: the two players chosen so far in the open picker.
+  const [pair, setPair] = useState<string[]>([]);
+  const isDoubles = category === 'doubles';
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<Record<string, Feedback | undefined>>({});
 
-  const feedbackKey = (place: AwardPlace) => `${sport}:${place}`;
+  const feedbackKey = (place: AwardPlace) => `${sport}:${category}:${place}`;
   const setPlaceFeedback = (place: AwardPlace, value: Feedback | undefined) =>
     setFeedback((prev) => ({ ...prev, [feedbackKey(place)]: value }));
 
   const awardFor = (place: AwardPlace): SportAward | undefined =>
-    awards.find((a) => a.sport === sport && a.place === place);
+    awards.find((a) => a.sport === sport && a.category === category && a.place === place);
 
-  const holderId = (award: SportAward | undefined) =>
-    award ? (isTeamSport(sport) ? award.teamId : award.playerId) : null;
+  /** Team id, or the player ids (singles player / doubles pair) holding the award. */
+  const holderIds = (award: SportAward | undefined): string[] => {
+    if (!award) return [];
+    if (isTeamSport(sport)) return award.teamId ? [award.teamId] : [];
+    return award.recipientIds.length > 0 ? award.recipientIds : award.playerId ? [award.playerId] : [];
+  };
 
   const holderName = (award: SportAward) => {
     if (isTeamSport(sport)) {
       return (award.teamId && getTeamById(award.teamId)?.name) || 'Unknown team';
     }
-    return (award.playerId && getPlayerById(award.playerId)?.name) || 'Unknown player';
+    const names = holderIds(award).map((id) => getPlayerById(id)?.name ?? 'Unknown player');
+    return names.length > 0 ? names.join(' & ') : 'Unknown player';
   };
 
   const filteredPlayers = useMemo(() => {
@@ -74,31 +92,50 @@ export default function ManageAwardsScreen() {
 
   const selectSport = (next: StatSport) => {
     setSport(next);
+    setCategory(awardCategoriesFor(next)[0]);
     setPicking(null);
+    setPair([]);
+    setSearch('');
+  };
+
+  const selectCategory = (next: AwardCategory) => {
+    setCategory(next);
+    setPicking(null);
+    setPair([]);
     setSearch('');
   };
 
   const openPicker = (place: AwardPlace) => {
     setPicking(picking === place ? null : place);
+    setPair([]);
     setSearch('');
     setPlaceFeedback(place, undefined);
   };
+
+  const togglePairPlayer = (id: string) =>
+    setPair((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : prev.length < 2 ? [...prev, id] : prev));
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: SPORT_AWARDS_KEY });
     await refetch();
   };
 
-  const handlePick = async (place: AwardPlace, id: string, name: string) => {
+  const handlePick = async (place: AwardPlace, ids: string[], name: string) => {
     if (saving) return;
     setPlaceFeedback(place, undefined);
     setSaving(true);
     try {
       await runWithGlobalLoading(async () => {
-        await setSportAward(sport, place, isTeamSport(sport) ? { teamId: id } : { playerId: id });
+        await setSportAward(
+          sport,
+          category,
+          place,
+          isTeamSport(sport) ? { teamId: ids[0] } : { playerIds: ids }
+        );
         await refresh();
       }, `Setting ${PLACE_LABEL[place].toLowerCase()}...`);
       setPicking(null);
+      setPair([]);
       setSearch('');
       setPlaceFeedback(place, { kind: 'ok', text: `${name} is now ${PLACE_LABEL[place].toLowerCase()}.` });
     } catch (error) {
@@ -115,7 +152,7 @@ export default function ManageAwardsScreen() {
     setSaving(true);
     try {
       await runWithGlobalLoading(async () => {
-        await clearSportAward(sport, place);
+        await clearSportAward(sport, category, place);
         await refresh();
       }, `Clearing ${PLACE_LABEL[place].toLowerCase()}...`);
       setPicking(null);
@@ -166,9 +203,16 @@ export default function ManageAwardsScreen() {
 
   const renderPicker = (place: AwardPlace) => {
     const otherPlace: AwardPlace = place === 1 ? 2 : 1;
-    const otherId = holderId(awardFor(otherPlace));
-    const currentId = holderId(awardFor(place));
+    const otherIds = holderIds(awardFor(otherPlace));
+    const currentIds = holderIds(awardFor(place));
     const teamSport = isTeamSport(sport);
+    // Doubles: a pair can't be the same two players as the other place, but one
+    // player may be in both pairs. Singles and teams: the other place's holder
+    // is unavailable.
+    const sameAsOther = (ids: string[]) =>
+      ids.length > 0 && ids.length === otherIds.length && ids.every((id) => otherIds.includes(id));
+    const pairNames = pair.map((id) => getPlayerById(id)?.name ?? 'Unknown player');
+    const canSavePair = pair.length === 2 && !sameAsOther(pair) && !saving;
 
     const options = teamSport
       ? teams.map((t) => ({ id: t.id, name: t.name, color: t.color }))
@@ -177,7 +221,7 @@ export default function ManageAwardsScreen() {
     return (
       <View style={styles.picker}>
         <Text style={styles.pickerTitle}>
-          {teamSport ? 'Choose a team' : 'Choose a player'}
+          {teamSport ? 'Choose a team' : isDoubles ? `Choose two players (${pair.length}/2)` : 'Choose a player'}
         </Text>
         {!teamSport && (
           <View style={styles.searchBox}>
@@ -200,19 +244,28 @@ export default function ManageAwardsScreen() {
         ) : (
           <View style={styles.optionList}>
             {options.map((opt, index) => {
-              const takenByOther = opt.id === otherId;
-              const isCurrent = opt.id === currentId;
-              const disabled = takenByOther || isCurrent || saving;
+              const inPair = isDoubles && pair.includes(opt.id);
+              const takenByOther = !isDoubles && otherIds.includes(opt.id);
+              const isCurrent = !isDoubles && currentIds.includes(opt.id);
+              const pairFull = isDoubles && !inPair && pair.length >= 2;
+              const disabled = takenByOther || isCurrent || pairFull || saving;
               const note = takenByOther ? ALREADY_LABEL[otherPlace] : isCurrent ? 'Current' : null;
               return (
                 <TouchableOpacity
                   key={opt.id}
-                  style={[styles.option, index > 0 && styles.optionRuled, disabled && styles.disabled]}
-                  onPress={() => handlePick(place, opt.id, opt.name)}
+                  style={[
+                    styles.option,
+                    index > 0 && styles.optionRuled,
+                    inPair && styles.optionSelected,
+                    disabled && styles.disabled,
+                  ]}
+                  onPress={() =>
+                    isDoubles ? togglePairPlayer(opt.id) : handlePick(place, [opt.id], opt.name)
+                  }
                   disabled={disabled}
                   activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled }}
+                  accessibilityRole={isDoubles ? 'checkbox' : 'button'}
+                  accessibilityState={isDoubles ? { checked: inPair, disabled } : { disabled }}
                   accessibilityLabel={note ? `${opt.name}, ${note}` : opt.name}
                 >
                   {teamSport ? (
@@ -224,14 +277,31 @@ export default function ManageAwardsScreen() {
                   )}
                   <Text style={styles.optionText} numberOfLines={1}>{opt.name}</Text>
                   {note && <Text style={styles.optionNote}>{note}</Text>}
+                  {inPair && <Check size={20} color={Colors.onHighlight} />}
                 </TouchableOpacity>
               );
             })}
           </View>
         )}
+        {isDoubles && (
+          <TouchableOpacity
+            style={[styles.primaryButton, styles.savePairButton, !canSavePair && styles.disabled]}
+            onPress={() => handlePick(place, pair, pairNames.join(' & '))}
+            disabled={!canSavePair}
+            accessibilityRole="button"
+            accessibilityLabel={pair.length === 2 ? `Save pair ${pairNames.join(' and ')}` : 'Save pair'}
+          >
+            <Text style={styles.primaryButtonText}>
+              {pair.length === 2 && sameAsOther(pair) ? ALREADY_LABEL[otherPlace] : 'Save pair'}
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.cancelButton}
-          onPress={() => setPicking(null)}
+          onPress={() => {
+            setPicking(null);
+            setPair([]);
+          }}
           accessibilityRole="button"
         >
           <Text style={styles.textButtonLabel}>Cancel</Text>
@@ -251,7 +321,11 @@ export default function ManageAwardsScreen() {
     return (
       <View key={place} style={[styles.block, { borderColor: accent }]}>
         <View style={[styles.blockHeader, { backgroundColor: soft }]}>
-          <Text style={styles.blockTitle} accessibilityRole="header">{PLACE_LABEL[place]}</Text>
+          <Text style={styles.blockTitle} accessibilityRole="header">
+            {CATEGORY_LABEL[category]
+              ? `${CATEGORY_LABEL[category]} ${PLACE_LABEL[place].toLowerCase()}`
+              : PLACE_LABEL[place]}
+          </Text>
         </View>
 
         <View style={styles.blockBody}>
@@ -347,6 +421,27 @@ export default function ManageAwardsScreen() {
         })}
       </View>
 
+      {sport === 'table_tennis' && (
+        <View style={styles.categoryRow} accessibilityRole="radiogroup" accessibilityLabel="Table tennis category">
+          {awardCategoriesFor('table_tennis').map((c) => {
+            const selected = category === c;
+            return (
+              <TouchableOpacity
+                key={c}
+                style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                onPress={() => selectCategory(c)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
+                  {CATEGORY_LABEL[c]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -372,7 +467,9 @@ export default function ManageAwardsScreen() {
             <View style={styles.blocks}>{PLACES.map(renderBlock)}</View>
 
             <Text style={styles.footnote}>
-              A team award recognises the players on the team now. They keep it if they move teams.
+              {sport === 'table_tennis'
+                ? 'Singles and doubles each have a champion and runner-up. A doubles award recognises both players.'
+                : 'A team award recognises the players on the team now. They keep it if they move teams.'}
             </Text>
           </ScrollView>
         </SafeAreaView>
@@ -382,6 +479,40 @@ export default function ManageAwardsScreen() {
 }
 
 const styles = StyleSheet.create({
+  categoryRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.md,
+  },
+  categoryChip: {
+    flex: 1,
+    minHeight: Touch,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+  },
+  categoryChipSelected: {
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.ink,
+  },
+  categoryChipText: {
+    ...Type.bodyStrong,
+    color: Colors.textSecondary,
+  },
+  categoryChipTextSelected: {
+    color: Colors.onHighlight,
+  },
+  optionSelected: {
+    backgroundColor: Colors.highlight,
+  },
+  savePairButton: {
+    alignSelf: 'stretch',
+    marginTop: Space.md,
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
