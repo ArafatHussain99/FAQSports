@@ -64,6 +64,7 @@ export default function MoreScreen() {
         { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', onPress: () => router.push('/cricket/create-match') },
         { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', onPress: () => router.push('/teams') },
         { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', onPress: () => router.push('/manage-stadiums') },
+        { icon: Trophy, label: 'Champions', subtitle: 'Set winners and runners-up', onPress: () => router.push('/manage-awards') },
       ],
     });
   }

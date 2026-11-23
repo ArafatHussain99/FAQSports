@@ -59,7 +59,7 @@ export default function HomeScreen() {
       case 'football':
         return player.stats.goals || 0;
       case 'table_tennis':
-        return player.stats.wins || 0;
+        return player.stats.ttWins || 0;
       case 'badminton':
       case 'carrom':
       case 'uno':

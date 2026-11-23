@@ -1,16 +1,42 @@
 import { updatePlayerProfile } from '@/api/playerApi';
+import { getPlayerMatchStats, groupByTeam, StatSport, TeamSpell } from '@/api/statsApi';
 import Colors from '@/constants/colors';
 import { getPlayerCover, PLAYER_COVERS } from '@/constants/playerCovers';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { Comment, PerformanceSummary } from '@/types';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { Ban, Pencil, Send, X } from 'lucide-react-native';
+import { STAT_SPORT_LABELS, useSportAwards } from '@/hooks/useSportAwards';
+import { Comment, PerformanceSummary, SportType } from '@/types';
+import { useQuery } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ban, ChevronRight, Pencil, Send, Trophy, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const NICKNAME_MAX_LENGTH = 30;
+
+const STAT_SPORTS: StatSport[] = ['cricket', 'football', 'table_tennis'];
+
+function isStatSport(sport: SportType): sport is StatSport {
+  return (STAT_SPORTS as string[]).includes(sport);
+}
+
+function plural(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** The numbers shown on a "Teams played for" row, for the selected sport. */
+function spellSummary(spell: TeamSpell, sport: StatSport): string {
+  const parts = [plural(spell.matches, 'match', 'matches')];
+  if (sport === 'cricket') {
+    parts.push(plural(spell.runs, 'run', 'runs'), plural(spell.wickets, 'wicket', 'wickets'));
+  } else if (sport === 'football') {
+    parts.push(plural(spell.goals, 'goal', 'goals'));
+  } else {
+    parts.push(plural(spell.wins, 'win', 'wins'));
+  }
+  return parts.join(' · ');
+}
 
 type StatItem = { label: string; value: string | number };
 
@@ -44,7 +70,17 @@ function getResult(performance: PerformanceSummary): 'win' | 'loss' | null {
 export default function PlayerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPlayerById, getTeamById, refetchPlayers } = useData();
-  const { userName, isAdmin, runWithGlobalLoading } = useApp();
+  const { userName, isAdmin, runWithGlobalLoading, currentSport } = useApp();
+  const router = useRouter();
+  const [selectedSport, setSelectedSport] = useState<StatSport>(() =>
+    isStatSport(currentSport) ? currentSport : 'cricket'
+  );
+  const matchStatsQuery = useQuery({
+    queryKey: ['player-match-stats', id],
+    queryFn: () => getPlayerMatchStats(id as string),
+    enabled: !!id,
+  });
+  const { awardsForPlayer } = useSportAwards();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
 
@@ -162,13 +198,46 @@ export default function PlayerProfileScreen() {
     { label: 'Stumpings', value: player.stats.stumpings },
   ];
 
-  const otherStats: StatItem[] = [
+  const footballStats: StatItem[] = [
     { label: 'Goals', value: player.stats.goals ?? 0 },
     { label: 'Assists', value: player.stats.assists ?? 0 },
     { label: 'Wins', value: player.stats.wins ?? 0 },
   ];
 
+  const ttMatches = player.stats.ttMatches ?? 0;
+  const ttWins = player.stats.ttWins ?? 0;
+  const tableTennisStats: StatItem[] = [
+    { label: 'Matches', value: ttMatches },
+    { label: 'Wins', value: ttWins },
+    { label: 'Losses', value: player.stats.ttLosses ?? 0 },
+    { label: 'Win %', value: ttMatches > 0 ? `${Math.round((ttWins / ttMatches) * 100)}%` : '-' },
+  ];
+
+  const sportOverview: StatItem[] =
+    selectedSport === 'cricket' ? overviewStats : selectedSport === 'football' ? footballStats : tableTennisStats;
+
   const lastFive = player.lastFivePerformances.slice(0, 5);
+
+  const awards = awardsForPlayer(player.id);
+
+  // Teams played for in the selected sport. Totals stay with the team the
+  // player was in at the time, even after they leave it.
+  const allSpells = matchStatsQuery.data ? groupByTeam(matchStatsQuery.data) : [];
+  const spells = allSpells.filter((spell) => spell.sport === selectedSport);
+  if (matchStatsQuery.data && team && !allSpells.some((spell) => spell.teamId === team.id)) {
+    // Current team with no recorded matches yet: list it with 0 matches.
+    spells.unshift({
+      teamId: team.id,
+      teamName: team.name,
+      sport: selectedSport,
+      matches: 0,
+      runs: 0,
+      wickets: 0,
+      goals: 0,
+      wins: 0,
+      lastPlayed: '',
+    });
+  }
 
   return (
     <KeyboardAvoidingView
@@ -190,7 +259,36 @@ export default function PlayerProfileScreen() {
 
         <View style={styles.body}>
           <View style={styles.identity}>
-            <Text style={styles.playerName}>{player.name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.playerName}>{player.name}</Text>
+              {awards.map((award) => (
+                <Trophy
+                  key={`${award.sport}-${award.place}`}
+                  size={22}
+                  color={award.place === 1 ? Colors.gold : Colors.silver}
+                  accessibilityLabel={`${STAT_SPORT_LABELS[award.sport]} ${award.place === 1 ? 'champion' : 'runner-up'}`}
+                />
+              ))}
+            </View>
+            {awards.length > 0 && (
+              <View style={styles.awardRow}>
+                {awards.map((award) => {
+                  const champion = award.place === 1;
+                  const label = `${STAT_SPORT_LABELS[award.sport]} ${champion ? 'champion' : 'runner-up'}`;
+                  return (
+                    <View
+                      key={`${award.sport}-${award.place}`}
+                      style={[styles.awardTag, champion ? styles.awardTagGold : styles.awardTagSilver]}
+                      accessible
+                      accessibilityLabel={label}
+                    >
+                      <Trophy size={12} color={champion ? Colors.gold : Colors.silver} />
+                      <Text style={styles.awardTagText}>{label.toUpperCase()}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
             {player.nickname && (
               <Text style={styles.playerNickname}>&ldquo;{player.nickname}&rdquo;</Text>
             )}
@@ -216,20 +314,47 @@ export default function PlayerProfileScreen() {
             </View>
           </View>
 
-          <StatGrid items={overviewStats} />
-
-          <Text style={styles.sectionTitle}>Skill ratings</Text>
-          <View style={styles.card}>
-            {ratings.map((rating) => (
-              <View key={rating.label} style={styles.ratingItem}>
-                <Text style={styles.ratingLabel}>{rating.label}</Text>
-                <View style={styles.ratingTrack}>
-                  <View style={[styles.ratingBar, { width: `${rating.value}%` }]} />
-                </View>
-                <Text style={styles.ratingValue}>{rating.value}</Text>
-              </View>
-            ))}
+          <View style={styles.segmentRow} accessibilityRole="tablist">
+            {STAT_SPORTS.map((sport) => {
+              const selected = selectedSport === sport;
+              return (
+                <TouchableOpacity
+                  key={sport}
+                  style={[styles.segment, selected && styles.segmentSelected]}
+                  onPress={() => setSelectedSport(sport)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${STAT_SPORT_LABELS[sport]} stats`}
+                >
+                  <Text
+                    style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                    numberOfLines={1}
+                  >
+                    {STAT_SPORT_LABELS[sport]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+
+          <StatGrid items={sportOverview} />
+
+          {selectedSport === 'cricket' && (
+            <>
+              <Text style={styles.sectionTitle}>Skill ratings</Text>
+              <View style={styles.card}>
+                {ratings.map((rating) => (
+                  <View key={rating.label} style={styles.ratingItem}>
+                    <Text style={styles.ratingLabel}>{rating.label}</Text>
+                    <View style={styles.ratingTrack}>
+                      <View style={[styles.ratingBar, { width: `${rating.value}%` }]} />
+                    </View>
+                    <Text style={styles.ratingValue}>{rating.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
 
           <Text style={styles.sectionTitle}>Last five</Text>
           {lastFive.length === 0 ? (
@@ -255,17 +380,79 @@ export default function PlayerProfileScreen() {
             </View>
           )}
 
-          <Text style={styles.sectionTitle}>Batting</Text>
-          <StatGrid items={battingStats} size="medium" />
+          {selectedSport === 'cricket' && (
+            <>
+              <Text style={styles.sectionTitle}>Batting</Text>
+              <StatGrid items={battingStats} size="medium" />
 
-          <Text style={styles.sectionTitle}>Bowling</Text>
-          <StatGrid items={bowlingStats} size="medium" />
+              <Text style={styles.sectionTitle}>Bowling</Text>
+              <StatGrid items={bowlingStats} size="medium" />
 
-          <Text style={styles.sectionTitle}>Fielding</Text>
-          <StatGrid items={fieldingStats} size="medium" />
+              <Text style={styles.sectionTitle}>Fielding</Text>
+              <StatGrid items={fieldingStats} size="medium" />
+            </>
+          )}
 
-          <Text style={styles.sectionTitle}>Other</Text>
-          <StatGrid items={otherStats} size="medium" />
+          <Text style={styles.sectionTitle}>Teams played for</Text>
+          {matchStatsQuery.isPending && !matchStatsQuery.isError ? (
+            <View style={styles.stateRow}>
+              <ActivityIndicator color={Colors.textSecondary} />
+              <Text style={styles.emptyLine}>Loading teams...</Text>
+            </View>
+          ) : matchStatsQuery.isError ? (
+            <View style={styles.stateRow}>
+              <Text style={[styles.emptyLine, styles.stateText]}>Couldn&apos;t load teams.</Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => matchStatsQuery.refetch()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading teams"
+              >
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : spells.length === 0 ? (
+            <Text style={styles.emptyLine}>No matches recorded yet.</Text>
+          ) : (
+            <View style={styles.listCard}>
+              {spells.map((spell, index) => {
+                const spellTeam = spell.teamId ? getTeamById(spell.teamId) : undefined;
+                const isCurrent = !!spell.teamId && spell.teamId === player.teamId;
+                const isArchived = !!spellTeam?.archivedAt;
+                const summary = spellSummary(spell, selectedSport);
+                const teamId = spell.teamId;
+                return (
+                  <TouchableOpacity
+                    key={`${spell.sport}:${spell.teamId ?? spell.teamName}`}
+                    style={[styles.spellRow, index > 0 && styles.spellRowRuled]}
+                    onPress={teamId ? () => router.push(`/team/${teamId}`) : undefined}
+                    disabled={!teamId}
+                    accessibilityRole={teamId ? 'button' : undefined}
+                    accessibilityLabel={`${spell.teamName}${isCurrent ? ', current team' : ''}${isArchived ? ', archived' : ''}, ${summary}`}
+                  >
+                    <View style={[styles.teamPin, { backgroundColor: spellTeam?.color ?? Colors.ink }]} />
+                    <View style={styles.spellBody}>
+                      <View style={styles.spellTitleRow}>
+                        <Text style={styles.spellName} numberOfLines={1}>{spell.teamName}</Text>
+                        {isCurrent && (
+                          <View style={styles.currentTag}>
+                            <Text style={styles.currentTagText}>CURRENT</Text>
+                          </View>
+                        )}
+                        {isArchived && (
+                          <View style={styles.archivedTag}>
+                            <Text style={styles.archivedTagText}>ARCHIVED</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.spellSummary}>{summary}</Text>
+                    </View>
+                    {teamId && <ChevronRight size={20} color={Colors.textSecondary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           <Text style={styles.sectionTitle}>Comments</Text>
           {comments.length === 0 ? (
@@ -452,8 +639,68 @@ const styles = StyleSheet.create({
     paddingTop: Space.xl,
     paddingBottom: Space.xs,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
   playerName: {
     ...Type.title,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  awardRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+    marginTop: Space.xs,
+  },
+  awardTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+  },
+  awardTagGold: {
+    backgroundColor: Colors.goldSoft,
+    borderColor: Colors.gold,
+  },
+  awardTagSilver: {
+    backgroundColor: Colors.silverSoft,
+    borderColor: Colors.silver,
+  },
+  awardTagText: {
+    ...Type.tag,
+    color: Colors.ink,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    marginTop: Space.lg,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -Hairline,
+  },
+  segmentSelected: {
+    borderBottomColor: Colors.ink,
+  },
+  segmentText: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  segmentTextSelected: {
+    fontWeight: '700',
     color: Colors.text,
   },
   playerNickname: {
@@ -582,6 +829,86 @@ const styles = StyleSheet.create({
   },
   emptyLine: {
     ...Type.subhead,
+    color: Colors.textSecondary,
+  },
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  stateText: {
+    flex: 1,
+  },
+  retryBtn: {
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    ...Type.headline,
+    color: Colors.text,
+  },
+  listCard: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  spellRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: Touch + Space.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  spellRowRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  spellBody: {
+    flex: 1,
+    gap: Space.xxs,
+  },
+  spellTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
+  spellName: {
+    ...Type.bodyStrong,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  spellSummary: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    fontVariant: ['tabular-nums'],
+  },
+  currentTag: {
+    backgroundColor: Colors.highlight,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: Space.xxs,
+  },
+  currentTagText: {
+    ...Type.tag,
+    color: Colors.onHighlight,
+  },
+  archivedTag: {
+    borderWidth: 1,
+    borderColor: Colors.textSecondary,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: Space.xxs - 1,
+  },
+  archivedTagText: {
+    ...Type.tag,
     color: Colors.textSecondary,
   },
   formRow: {

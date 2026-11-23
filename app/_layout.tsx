@@ -34,6 +34,7 @@ function RootLayoutNav() {
       <Stack.Screen name="player/[id]" options={{ title: 'Player Profile' }} />
       <Stack.Screen name="team/[id]" options={{ title: 'Team Details' }} />
       <Stack.Screen name="manage-stadiums" options={{ title: 'Manage Stadiums' }} />
+      <Stack.Screen name="manage-awards" options={{ title: 'Champions' }} />
 
       {/* Cricket */}
       <Stack.Screen name="cricket/create-match" options={{ title: 'Create Match', presentation: 'modal' }} />

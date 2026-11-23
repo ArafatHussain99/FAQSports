@@ -55,6 +55,13 @@ export default {
   carrom: '#B4540A',
   uno: '#0E8C7F',
 
+  // Recognition: current champion (gold) and runner-up (silver).
+  // The dark tone is for icons, borders and large text; ink text sits on the soft tone.
+  gold: '#9A6B00',
+  goldSoft: '#F7E7B4',
+  silver: '#5F6670',
+  silverSoft: '#E4E6EA',
+
   // Role tags (ink text sits on these)
   adminBadge: '#E8F24A',
   playerBadge: '#D5E2FA',

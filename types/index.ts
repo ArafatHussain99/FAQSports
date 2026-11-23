@@ -45,15 +45,19 @@ export interface PlayerStats {
   average: number;
   strikeRate: number;
   economyRate: number;
-  // Football stats
+  // Football stats (player_stats.goals / assists / wins)
   goals?: number;
   assists?: number;
   saves?: number;
   yellowCards?: number;
   redCards?: number;
-  // Table Tennis stats
+  /** Football wins. Not cricket. */
   wins?: number;
   losses?: number;
+  // Table tennis stats (player_stats.tt_matches / tt_wins / tt_losses)
+  ttMatches?: number;
+  ttWins?: number;
+  ttLosses?: number;
   pointsFor?: number;
   pointsAgainst?: number;
 }
@@ -84,6 +88,8 @@ export interface Team {
   color: string;
   players: string[];
   captain?: string;
+  /** Set when the team is archived (teams can't be deleted). */
+  archivedAt?: string;
 }
 
 export interface Tournament {

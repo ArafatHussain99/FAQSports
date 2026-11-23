@@ -1,20 +1,78 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
-import { useData } from '@/context/AppContext';
+import { useApp, useData } from '@/context/AppContext';
 import { Player } from '@/types';
+import { restoreTeam } from '@/api/teamApi';
+import { getTeamMatchStats, totalsByPlayer } from '@/api/statsApi';
+
+const formatDate = (iso?: string) => {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 export default function TeamDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getTeamById, getTeamPlayers, players } = useData();
+  const { isAdmin, runWithGlobalLoading } = useApp();
+  const { getTeamById, getTeamPlayers, getPlayerById, players, refetchTeams, refetchPlayers, isLoadingData } = useData();
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const team = getTeamById(id || '');
   const teamPlayers = getTeamPlayers(id || '');
+
+  const historyQuery = useQuery({
+    queryKey: ['team-match-stats', id],
+    queryFn: () => getTeamMatchStats(id as string),
+    enabled: !!id && !!team,
+  });
+
+  // Every player with recorded matches for this team, current and former, most runs first.
+  const history = useMemo(
+    () =>
+      totalsByPlayer(historyQuery.data ?? []).sort(
+        (a, b) => b.runs - a.runs || b.wickets - a.wickets || b.goals - a.goals || b.matches - a.matches
+      ),
+    [historyQuery.data]
+  );
+
+  const handleRestore = async () => {
+    if (!team || isRestoring) return;
+    setIsRestoring(true);
+    try {
+      await runWithGlobalLoading(async () => {
+        await restoreTeam(team.id);
+        await Promise.all([refetchTeams(), refetchPlayers()]);
+      }, 'Restoring team...');
+      Alert.alert('Success', `Team ${team.name} restored.`);
+    } catch (error) {
+      console.error('Error restoring team:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? `Failed to restore team: ${error.message}` : 'Failed to restore team. Please try again.'
+      );
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  if (!team && isLoadingData) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={{ title: 'Team' }} />
+        <View style={styles.errorContainer}>
+          <ActivityIndicator color={Colors.textSecondary} />
+        </View>
+      </View>
+    );
+  }
 
   if (!team) {
     return (
@@ -27,6 +85,7 @@ export default function TeamDetailScreen() {
     );
   }
 
+  const isArchived = !!team.archivedAt;
   const captain = players.find(p => p.id === team.captain);
   const totalRuns = teamPlayers.reduce((sum, p) => sum + p.stats.runs, 0);
   const totalWickets = teamPlayers.reduce((sum, p) => sum + p.stats.wickets, 0);
@@ -72,6 +131,25 @@ export default function TeamDetailScreen() {
           )}
         </View>
 
+        {isArchived && (
+          <View style={styles.archivedBanner} accessibilityRole="summary">
+            <Text style={styles.archivedBannerText}>
+              Archived{formatDate(team.archivedAt) ? ` ${formatDate(team.archivedAt)}` : ''}. Players were removed from this team; its match history is kept.
+            </Text>
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.outlineButton, isRestoring && styles.disabled]}
+                onPress={handleRestore}
+                disabled={isRestoring}
+                accessibilityRole="button"
+                accessibilityLabel={`Restore ${team.name}`}
+              >
+                <Text style={styles.outlineButtonText}>{isRestoring ? 'Restoring...' : 'Restore team'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <View style={styles.summary}>
           {summary.map((item, index) => (
             <View key={item.label} style={[styles.summaryCell, index > 0 && styles.summaryCellRuled]}>
@@ -83,7 +161,9 @@ export default function TeamDetailScreen() {
 
         <Text style={styles.sectionTitle}>Squad ({teamPlayers.length})</Text>
         {teamPlayers.length === 0 ? (
-          <Text style={styles.emptyLine}>No players in this team yet.</Text>
+          <Text style={styles.emptyLine}>
+            {isArchived ? 'No current players. This team is archived.' : 'No players in this team yet.'}
+          </Text>
         ) : (
           <View style={styles.group}>
             {teamPlayers.map((player, index) => (
@@ -125,6 +205,69 @@ export default function TeamDetailScreen() {
                 </View>
               </TouchableOpacity>
             ))}
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Team history</Text>
+        {historyQuery.isPending && !historyQuery.isError ? (
+          <View style={styles.historyState}>
+            <ActivityIndicator color={Colors.textSecondary} />
+          </View>
+        ) : historyQuery.isError ? (
+          <View style={styles.historyState}>
+            <Text style={styles.emptyLine}>Couldn&apos;t load this team&apos;s match history.</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => historyQuery.refetch()}
+              hitSlop={{ top: 8, bottom: 8 }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : history.length === 0 ? (
+          <Text style={styles.emptyLine}>No matches recorded for this team yet.</Text>
+        ) : (
+          <View style={styles.group}>
+            <View style={styles.historyHeader}>
+              <Text style={[styles.historyHeaderText, styles.historyName]}>Player</Text>
+              <Text style={[styles.historyHeaderText, styles.historyCell]}>M</Text>
+              <Text style={[styles.historyHeaderText, styles.historyCell]}>Runs</Text>
+              <Text style={[styles.historyHeaderText, styles.historyCell]}>Wkts</Text>
+              <Text style={[styles.historyHeaderText, styles.historyCell]}>Goals</Text>
+              <View style={styles.historyChevron} />
+            </View>
+            {history.map(row => {
+              const player = getPlayerById(row.playerId);
+              const isFormer = player?.teamId !== team.id;
+              const name = player?.name ?? 'Unknown player';
+              return (
+                <TouchableOpacity
+                  key={row.playerId}
+                  style={[styles.historyRow, styles.rowContentRuled]}
+                  onPress={() => router.push(`/player/${row.playerId}`)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${name}${isFormer ? ', former player' : ''}, ${row.matches} matches, ${row.runs} runs, ${row.wickets} wickets, ${row.goals} goals`}
+                >
+                  <View style={[styles.historyName, styles.playerNameRow]}>
+                    <Text style={styles.playerName} numberOfLines={1}>{name}</Text>
+                    {isFormer && (
+                      <View style={styles.formerTag}>
+                        <Text style={styles.formerTagText}>FORMER</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.playerStatValue, styles.historyCell]}>{row.matches}</Text>
+                  <Text style={[styles.playerStatValue, styles.historyCell]}>{row.runs}</Text>
+                  <Text style={[styles.playerStatValue, styles.historyCell]}>{row.wickets}</Text>
+                  <Text style={[styles.playerStatValue, styles.historyCell]}>{row.goals}</Text>
+                  <View style={styles.historyChevron}>
+                    <ChevronRight size={20} color={Colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -229,6 +372,92 @@ const styles = StyleSheet.create({
     ...Type.subhead,
     fontWeight: '700',
     color: Colors.primary,
+  },
+  archivedBanner: {
+    marginTop: Space.lg,
+    padding: Space.lg,
+    gap: Space.md,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+  },
+  archivedBannerText: {
+    ...Type.subhead,
+    color: Colors.text,
+  },
+  outlineButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    paddingHorizontal: Space.lg,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    borderRadius: Radius.md,
+  },
+  outlineButtonText: {
+    ...Type.headline,
+    color: Colors.text,
+  },
+  disabled: {
+    opacity: 0.4,
+  },
+  historyState: {
+    paddingVertical: Space.md,
+    alignItems: 'flex-start',
+    gap: Space.sm,
+  },
+  retryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  retryText: {
+    ...Type.subhead,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    paddingVertical: Space.sm,
+    paddingLeft: Space.lg,
+    paddingRight: Space.md,
+  },
+  historyHeaderText: {
+    ...Type.caption,
+    color: Colors.textSecondary,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    minHeight: Touch + Space.xs,
+    paddingVertical: Space.sm,
+    paddingLeft: Space.lg,
+    paddingRight: Space.md,
+  },
+  historyName: {
+    flex: 1,
+    minWidth: 0,
+  },
+  historyCell: {
+    width: 40,
+    textAlign: 'right',
+  },
+  historyChevron: {
+    width: 20,
+  },
+  formerTag: {
+    borderWidth: 1,
+    borderColor: Colors.textSecondary,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs,
+    paddingVertical: 1,
+  },
+  formerTagText: {
+    ...Type.tag,
+    color: Colors.textSecondary,
   },
   summary: {
     flexDirection: 'row',

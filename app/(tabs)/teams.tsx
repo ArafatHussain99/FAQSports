@@ -1,10 +1,10 @@
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
-import { Player } from '@/types';
+import { Player, Team } from '@/types';
 import { TypePlayerInfo } from '@/types/player';
 import { useRouter } from 'expo-router';
-import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
+import { Archive, Check, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { deletePlayerInfo, updatePlayerTeam, uploadPlayerInfo, uploadPlayerStats } from '@/api/playerApi';
-import { deleteTeamInfo, uploadTeamInfo } from '@/api/teamApi';
+import { archiveTeam, restoreTeam, uploadTeamInfo } from '@/api/teamApi';
 
 type TabType = 'teams' | 'players';
 type ModalType = 'addPlayer' | 'editPlayerTeam' | 'addTeam' | null;
@@ -44,9 +44,14 @@ interface SwipeableCardProps {
   onDelete: () => void;
   isAdmin: boolean;
   ruled?: boolean;
+  /** 'delete' (red, trash) or 'archive' (neutral ink, archive box). */
+  action?: 'delete' | 'archive';
 }
 
-function SwipeableCard({ children, onDelete, isAdmin, ruled }: SwipeableCardProps) {
+function SwipeableCard({ children, onDelete, isAdmin, ruled, action = 'delete' }: SwipeableCardProps) {
+  const isArchive = action === 'archive';
+  const actionLabel = isArchive ? 'Archive' : 'Delete';
+  const ActionIcon = isArchive ? Archive : Trash2;
   const swipeValue = useRef(new Animated.Value(0)).current;
   const isRTL = I18nManager.isRTL;
 
@@ -101,14 +106,14 @@ function SwipeableCard({ children, onDelete, isAdmin, ruled }: SwipeableCardProp
     <View style={[styles.swipeContainer, ruled && styles.swipeRuled]}>
       {isAdmin && (
       <TouchableOpacity
-        style={styles.deleteAction}
+        style={[styles.deleteAction, isArchive && styles.archiveAction]}
         onPress={handleDelete}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Delete"
+        accessibilityLabel={actionLabel}
       >
-        <Trash2 size={20} color={Colors.textInverse} />
-        <Text style={styles.deleteActionText}>Delete</Text>
+        <ActionIcon size={20} color={Colors.textInverse} />
+        <Text style={styles.deleteActionText}>{actionLabel}</Text>
       </TouchableOpacity>
       )}
       <Animated.View
@@ -129,8 +134,10 @@ function SwipeableCard({ children, onDelete, isAdmin, ruled }: SwipeableCardProp
 export default function TeamsScreen() {
   const router = useRouter();
   const { isAdmin, runWithGlobalLoading } = useApp();
-  const { teams, players, getTeamPlayers, refetchTeams, refetchPlayers } = useData();
+  const { teams, archivedTeams, allTeams, players, getTeamPlayers, refetchTeams, refetchPlayers } = useData();
   const [activeTab, setActiveTab] = useState<TabType>('teams');
+  const [showArchived, setShowArchived] = useState(false);
+  const [restoringTeamId, setRestoringTeamId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -256,33 +263,52 @@ export default function TeamsScreen() {
     }
   };
 
-  const handleDeleteTeam = (team: any) => {
+  const handleArchiveTeam = (team: Team) => {
     Alert.alert(
-      'Delete Team',
-      `Are you sure you want to delete "${team.name}"? Players will remain in the database but will not be assigned to any team.`,
+      'Archive Team',
+      `Archive ${team.name}? Its players will be removed from the team. You can restore it any time; its match history stays.`,
       [
         { text: 'Cancel', onPress: () => { }, style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: 'Archive',
           onPress: async () => {
             try {
               await runWithGlobalLoading(async () => {
-                await deleteTeamInfo(team.id);
+                await archiveTeam(team.id);
                 await Promise.all([refetchTeams(), refetchPlayers()]);
-              }, 'Deleting team...');
-              Alert.alert('Success', `Team ${team.name} deleted successfully!`);
+              }, 'Archiving team...');
+              Alert.alert('Success', `Team ${team.name} archived.`);
             } catch (error) {
-              console.error('Error deleting team:', error);
+              console.error('Error archiving team:', error);
               Alert.alert(
                 'Error',
-                error instanceof Error ? `Failed to delete team: ${error.message}` : 'Failed to delete team. Please try again.'
+                error instanceof Error ? `Failed to archive team: ${error.message}` : 'Failed to archive team. Please try again.'
               );
             }
           },
         },
       ]
     );
+  };
+
+  const handleRestoreTeam = async (team: Team) => {
+    if (restoringTeamId) return;
+    setRestoringTeamId(team.id);
+    try {
+      await runWithGlobalLoading(async () => {
+        await restoreTeam(team.id);
+        await Promise.all([refetchTeams(), refetchPlayers()]);
+      }, 'Restoring team...');
+      Alert.alert('Success', `Team ${team.name} restored.`);
+    } catch (error) {
+      console.error('Error restoring team:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? `Failed to restore team: ${error.message}` : 'Failed to restore team. Please try again.'
+      );
+    } finally {
+      setRestoringTeamId(null);
+    }
   };
 
   const handleDeletePlayer = (player: Player) => {
@@ -351,7 +377,15 @@ export default function TeamsScreen() {
     }
   };
 
-  const getTeam = (teamId?: string | null) => (teamId ? teams.find(t => t.id === teamId) : undefined);
+  // Search all teams so a player's archived team still resolves.
+  const getTeam = (teamId?: string | null) => (teamId ? allTeams.find(t => t.id === teamId) : undefined);
+
+  const formatArchivedDate = (iso?: string) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   const renderEmpty = (title: string, subtitle: string) => (
     <View style={styles.emptyState}>
@@ -428,7 +462,8 @@ export default function TeamsScreen() {
                 <SwipeableCard
                   key={team.id}
                   isAdmin={isAdmin}
-                  onDelete={() => handleDeleteTeam(team)}
+                  onDelete={() => handleArchiveTeam(team)}
+                  action="archive"
                   ruled={index > 0}
                 >
                   <TouchableOpacity
@@ -454,6 +489,77 @@ export default function TeamsScreen() {
                 </SwipeableCard>
               );
             })}
+          </View>
+        )}
+
+        {activeTab === 'teams' && archivedTeams.length > 0 && (
+          <View style={styles.archivedSection}>
+            <TouchableOpacity
+              style={styles.archivedToggle}
+              onPress={() => setShowArchived(v => !v)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showArchived }}
+              accessibilityLabel={`Archived teams, ${archivedTeams.length}`}
+            >
+              <Text style={styles.archivedToggleText}>
+                Archived <Text style={styles.segmentCount}>({archivedTeams.length})</Text>
+              </Text>
+              {showArchived
+                ? <ChevronDown size={20} color={Colors.textSecondary} />
+                : <ChevronRight size={20} color={Colors.textSecondary} />}
+            </TouchableOpacity>
+
+            {showArchived && (
+              <View style={styles.archivedList}>
+                {archivedTeams.map((team, index) => {
+                  const archivedOn = formatArchivedDate(team.archivedAt);
+                  const isRestoring = restoringTeamId === team.id;
+                  return (
+                    <View key={team.id} style={[styles.archivedRow, index > 0 && styles.swipeRuled]}>
+                      <TouchableOpacity
+                        style={styles.archivedRowMain}
+                        onPress={() => router.push(`/team/${team.id}`)}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${team.name}, archived${archivedOn ? ` ${archivedOn}` : ''}`}
+                      >
+                        <View style={[styles.teamTag, styles.muted, { borderColor: team.color || Colors.ink }]}>
+                          <View style={[styles.pin, { backgroundColor: team.color || Colors.ink }]} />
+                          <Text style={styles.teamTagText} numberOfLines={1}>{team.shortName}</Text>
+                        </View>
+                        <View style={styles.rowText}>
+                          <Text style={styles.rowTitle} numberOfLines={1}>{team.name}</Text>
+                          <Text style={styles.rowSubtitleMuted} numberOfLines={1}>
+                            Archived{archivedOn ? ` ${archivedOn}` : ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      {isAdmin && (
+                        <TouchableOpacity
+                          style={[styles.restoreBtn, restoringTeamId !== null && styles.disabled]}
+                          onPress={() => handleRestoreTeam(team)}
+                          disabled={restoringTeamId !== null}
+                          hitSlop={{ top: 8, bottom: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Restore ${team.name}`}
+                        >
+                          <Text style={styles.restoreText}>{isRestoring ? 'Restoring...' : 'Restore'}</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={styles.archivedChevron}
+                        onPress={() => router.push(`/team/${team.id}`)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${team.name}`}
+                      >
+                        <ChevronRight size={20} color={Colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
 
@@ -903,6 +1009,9 @@ const styles = StyleSheet.create({
     gap: Space.xxs,
     zIndex: 1,
   },
+  archiveAction: {
+    backgroundColor: Colors.ink,
+  },
   deleteActionText: {
     ...Type.caption,
     color: Colors.textInverse,
@@ -997,6 +1106,62 @@ const styles = StyleSheet.create({
     marginBottom: Space.sm,
   },
   changeTeamText: {
+    ...Type.footnote,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+
+  // Archived teams
+  archivedSection: {
+    marginTop: Space.md,
+  },
+  archivedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: Touch,
+    paddingHorizontal: Space.xs,
+  },
+  archivedToggleText: {
+    ...Type.subhead,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  archivedList: {
+    borderTopWidth: Hairline,
+    borderBottomWidth: Hairline,
+    borderColor: Colors.border,
+  },
+  archivedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  archivedRowMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    minHeight: 64,
+    paddingVertical: Space.md,
+    paddingLeft: Space.xs,
+    paddingRight: Space.sm,
+  },
+  archivedChevron: {
+    minHeight: 44,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  muted: {
+    opacity: 0.55,
+  },
+  restoreBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: Space.sm,
+  },
+  restoreText: {
     ...Type.footnote,
     fontWeight: '600',
     color: Colors.primary,

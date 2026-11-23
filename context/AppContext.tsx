@@ -6,7 +6,7 @@ import { Notification, Player, SportType, Team, UserRole } from '@/types';
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const ROLE_STORAGE_KEY = 'user_role';
 const USER_NAME_KEY = 'user_name';
@@ -182,9 +182,15 @@ export const [DataProvider, useData] = createContextHook(() => {
     return players.find(p => p.id === id);
   }, [players]);
 
+  // Archived teams stay in `allTeams` so old matches and profiles still
+  // resolve them, but `teams` (used by pickers and lists) is active teams only.
+  const allTeams = teams;
+  const activeTeams = useMemo(() => teams.filter(t => !t.archivedAt), [teams]);
+  const archivedTeams = useMemo(() => teams.filter(t => !!t.archivedAt), [teams]);
+
   const getTeamById = useCallback((id: string) => {
-    return teams.find(t => t.id === id);
-  }, [teams]);
+    return allTeams.find(t => t.id === id);
+  }, [allTeams]);
 
   const getTeamPlayers = useCallback((teamId: string) => {
     return players.filter(p => p.teamId === teamId);
@@ -236,7 +242,9 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   return {
     players,
-    teams,
+    teams: activeTeams,
+    archivedTeams,
+    allTeams,
     notifications,
     grounds,
     getPlayerById,

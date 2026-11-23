@@ -117,6 +117,7 @@ The database layout mirrors the app's in-memory `CricketMatch` type, split into 
 | `color` | text | yes | Must match `#RGB` or `#RRGGBB` (check constraint) |
 | `logo_url` | text | yes | |
 | `captain_player_id` | uuid → `players` | yes | |
+| `archived_at` | timestamptz | yes | Migration `20261124000000`. Set by `archive_team()`; teams are archived, never deleted. The app hides archived teams from pickers |
 
 ### `players`
 
@@ -137,11 +138,24 @@ The database layout mirrors the app's in-memory `CricketMatch` type, split into 
 | Column | Type | Null |
 |--------|------|------|
 | `player_id` | uuid → `players`, **unique** | no |
-| `matches`, `runs`, `balls`, `wickets`, `catches`, `run_outs`, `stumpings`, `highest_score`, `fifties`, `centuries`, `goals`, `assists`, `wins` | integer, default 0 | no |
+| `matches`, `runs`, `balls`, `wickets`, `catches`, `run_outs`, `stumpings`, `highest_score`, `fifties`, `centuries` | integer, default 0 | no — **cricket** |
+| `goals`, `assists`, `wins` | integer, default 0 | no — **football** (`wins` is football wins) |
+| `tt_matches`, `tt_wins`, `tt_losses` | integer, default 0 | no — **table tennis**, migration `20261124000000` |
+| `cricket_innings`, `cricket_dismissals`, `balls_bowled`, `runs_conceded` | integer, default 0 | no — cricket counters for averages, migration `20261124000000` |
 | `batting_average`, `strike_rate`, `economy_rate` | numeric, default 0 | no |
 | `best_bowling_wickets`, `best_bowling_runs` | **text** | yes |
 
 There's no primary key; `player_id` is unique. Best bowling figures are stored as text although the app treats them as numbers. Football extras (`saves`, cards) and table tennis fields (`losses`, `points_for`, `points_against`) from the app's `PlayerStats` type have no columns.
+
+Since migration `20261124000000` these columns are maintained by the `player_match_stats` trigger at match end: totals are added, `highest_score` and best bowling are only ever raised, and `batting_average` (runs ÷ dismissals), `strike_rate` and `economy_rate` are recomputed from the totals.
+
+### `player_match_stats` (one row per player per finished match)
+
+Migration `20261124000000`. Unique `(sport, match_id, player_id)`; `sport` is `cricket`, `football` or `table_tennis`; `match_id` is text (cricket matches aren't stored, so it holds the app's match id). `team_id` → `teams` (`ON DELETE SET NULL`) plus a `team_name` snapshot, so a player's runs and wickets stay with the team they played for. Cricket columns (`runs`, `balls`, `fours`, `sixes`, `batted`, `dismissed`, `wickets`, `balls_bowled`, `runs_conceded`, `catches`, `run_outs`, `stumpings`), football `goals`/`assists`, and `won` for football and table tennis. Read: everyone. Write: only through `record_match_stats()` (admins).
+
+### `sport_awards` and `sport_award_recipients`
+
+Migration `20261124000000`. Current champion (`place` 1) and runner-up (`place` 2) per sport, to a team or a player. Recipients are the players recognised, snapshotted when the award is set. Read: everyone. Write: `set_sport_award()` / `clear_sport_award()` (admins).
 
 ### `player_ratings` (one row per player)
 

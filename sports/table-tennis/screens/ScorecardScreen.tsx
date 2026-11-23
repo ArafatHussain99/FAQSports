@@ -1,3 +1,4 @@
+import { recordMatchStats } from '@/api/statsApi';
 import { isPermissionError, PERMISSION_ERROR_MESSAGE } from '@/api/supabaseClient';
 import Colors from '@/constants/colors';
 import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
@@ -206,6 +207,27 @@ export default function TableTennisScorecardScreen() {
       { ...snapshot, status: 'completed', winner: state.matchWinner, completedAt },
       { status: 'completed', winner: state.matchWinner, completedAt },
     );
+
+    // Count the win or loss for each player. Re-finishing with a different
+    // winner moves it between tt_wins and tt_losses instead of adding again.
+    const winner = state.matchWinner;
+    const lines = (['A', 'B'] as TTSide[]).flatMap(side =>
+      (side === 'A' ? config.teamA : config.teamB).map(playerId => ({
+        player_id: playerId,
+        team_id: players.find(p => p.id === playerId)?.teamId ?? null,
+        won: side === winner,
+      })),
+    );
+    recordMatchStats('table_tennis', match.id, lines)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['players'] }))
+      .catch(e => {
+        console.error('Failed to save table tennis stats:', e);
+        setActionError(
+          isPermissionError(e)
+            ? `Result saved, but player stats weren't. ${PERMISSION_ERROR_MESSAGE}`
+            : "Result saved, but player stats weren't. Reopen the match and finish it again to retry.",
+        );
+      });
   };
 
   const handleReopen = () => {

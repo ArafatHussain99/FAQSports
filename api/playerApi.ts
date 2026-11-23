@@ -114,7 +114,7 @@ type PlayerRecord = {
   run_outs: number | null;
   stumpings: number | null;
   highest_score: number | null;
-  best_bowling_wickets: number | null;
+  best_bowling_wickets: number | string | null;
   fifties: number | null;
   centuries: number | null;
   batting_average: number | null;
@@ -123,10 +123,25 @@ type PlayerRecord = {
   goals: number | null;
   assists: number | null;
   wins: number | null;
+  tt_matches?: number | null;
+  tt_wins?: number | null;
+  tt_losses?: number | null;
+  best_bowling_runs?: number | string | null;
 };
 
-const mapPlayerRecord = (player: PlayerRecord): Player => {
-  const bestBowlingWickets = player.best_bowling_wickets ?? 0;
+type StatsColumns = Omit<PlayerRecord, 'id' | 'name' | 'nickname' | 'cover_image_key' | 'team_id' | 'position' | 'batting_style' | 'bowling_style'>;
+
+// players joined with player_stats (one row per player). PostgREST returns the
+// embedded row as an object or a one-item array depending on the relationship.
+type PlayerRow = PlayerRecord & { player_stats?: Partial<StatsColumns> | Partial<StatsColumns>[] | null };
+
+const toNumber = (value: number | string | null | undefined) => Number(value ?? 0) || 0;
+
+const mapPlayerRecord = (row: PlayerRow): Player => {
+  const embedded = Array.isArray(row.player_stats) ? row.player_stats[0] : row.player_stats;
+  const player: PlayerRecord = { ...row, ...(embedded ?? {}) } as PlayerRecord;
+  const bestBowlingWickets = toNumber(player.best_bowling_wickets);
+  const bestBowlingRuns = toNumber(player.best_bowling_runs);
 
   return {
     id: player.id,
@@ -146,7 +161,7 @@ const mapPlayerRecord = (player: PlayerRecord): Player => {
       runOuts: player.run_outs ?? 0,
       stumpings: player.stumpings ?? 0,
       highestScore: player.highest_score ?? 0,
-      bestBowling: bestBowlingWickets ? `${bestBowlingWickets} wickets` : '-',
+      bestBowling: bestBowlingWickets ? `${bestBowlingWickets}/${bestBowlingRuns}` : '-',
       bestBowlingWickets,
       fifties: player.fifties ?? 0,
       centuries: player.centuries ?? 0,
@@ -156,6 +171,9 @@ const mapPlayerRecord = (player: PlayerRecord): Player => {
       goals: player.goals ?? 0,
       assists: player.assists ?? 0,
       wins: player.wins ?? 0,
+      ttMatches: player.tt_matches ?? 0,
+      ttWins: player.tt_wins ?? 0,
+      ttLosses: player.tt_losses ?? 0,
     },
     ratings: { batting: 50, bowling: 50, fielding: 50, overall: 50 },
     lastFivePerformances: [],
@@ -165,7 +183,7 @@ const mapPlayerRecord = (player: PlayerRecord): Player => {
 export const getPlayers = async (): Promise<Player[]> => {
   const { data, error } = await supabase
     .from('players')
-    .select('*')
+    .select('*, player_stats(*)')
     .order('name');
 
   if (error) {
@@ -173,13 +191,13 @@ export const getPlayers = async (): Promise<Player[]> => {
     throw error;
   }
 
-  return ((data ?? []) as PlayerRecord[]).map(mapPlayerRecord);
+  return ((data ?? []) as PlayerRow[]).map(mapPlayerRecord);
 };
 
 export const getTeamPlayers = async (teamId: string): Promise<Player[]> => {
   const { data, error } = await supabase
     .from('players')
-    .select('*')
+    .select('*, player_stats(*)')
     .eq('team_id', teamId)
     .order('name');
 
@@ -188,5 +206,5 @@ export const getTeamPlayers = async (teamId: string): Promise<Player[]> => {
     throw error;
   }
 
-  return ((data ?? []) as PlayerRecord[]).map(mapPlayerRecord);
+  return ((data ?? []) as PlayerRow[]).map(mapPlayerRecord);
 };

@@ -49,9 +49,14 @@ The client is created with default options: no `auth.storage`, so see [AUTHENTIC
 | `getUserRole(email)` | `api/authApi.ts` | `profiles` select `role` by `email` | `'admin' \| 'player' \| null` | Login | Yes; RLS only returns the caller's own row (D12) |
 | `getTeams()` | `api/teamApi.ts` | `teams` select | `Team[]` | `DataProvider` | Yes |
 | `uploadTeamInfo(info)` | `api/teamApi.ts` | `teams` insert | `void` | Teams tab | Yes for any signed-in user, not just admins (R2); duplicate name fails (D13) |
-| `deleteTeamInfo(teamId)` | `api/teamApi.ts` | `teams` delete + `select('id')` | `void` | Teams tab | Throws if 0 rows were deleted (RLS only lets one hard-coded user delete, R3; teams with saved matches are `RESTRICT`ed) |
-| `getPlayers()` | `api/playerApi.ts` | `players` select | `Player[]` | `DataProvider` | Runs, but **stats are always 0** (D1) |
-| `getTeamPlayers(teamId)` | `api/playerApi.ts` | `players` select by team | `Player[]` | **never** | Same as above (D1) |
+| `archiveTeam(teamId)` | `api/teamApi.ts` | RPC `archive_team` | `void` | Teams tab | Admins only (checked in SQL). Sets `teams.archived_at` and unassigns the team's players. Teams are never deleted. Needs migration `20261124000000` |
+| `restoreTeam(teamId)` | `api/teamApi.ts` | RPC `restore_team` | `void` | Teams tab, Team details | Admins only. Clears `archived_at`; players aren't re-added |
+| `getPlayers()` | `api/playerApi.ts` | `players` select with embedded `player_stats(*)` | `Player[]` | `DataProvider` | Yes; stats come from `player_stats` (fixes D1) |
+| `getTeamPlayers(teamId)` | `api/playerApi.ts` | same, filtered by team | `Player[]` | **never** | Yes |
+| `recordMatchStats(sport, matchId, lines)` | `api/statsApi.ts` | RPC `record_match_stats` | `number` (rows written) | Cricket match end (`sports/cricket/context.tsx`), table tennis Finish | Admins only. One `player_match_stats` row per player per match; repeats are ignored (table tennis: a changed winner is updated). A trigger rolls rows into `player_stats` and raises records. Cricket sends the app's match id (matches aren't stored yet); players/teams without a uuid are skipped |
+| `getPlayerMatchStats(playerId)` / `getTeamMatchStats(teamId)` | `api/statsApi.ts` | `player_match_stats` select | `PlayerMatchStatRow[]` | Player profile (teams played for), Team details (history incl. former players) | Readable by everyone |
+| `getSportAwards()` | `api/statsApi.ts` | `sport_awards` + `sport_award_recipients` select | `SportAward[]` | `useSportAwards` (profile, Champions) | Readable by everyone |
+| `setSportAward(sport, place, target)` / `clearSportAward(sport, place)` | `api/statsApi.ts` | RPCs `set_sport_award` / `clear_sport_award` | `void` | Champions (admin) | Admins only. A team award snapshots the team's current players as recipients |
 | `uploadPlayerInfo(info)` | `api/playerApi.ts` | `players` insert, returns id | `string` | Teams tab | Fails if `position` isn't an exact enum value (D3); no insert policy (R5) |
 | `uploadPlayerStats(stats)` | `api/playerApi.ts` | `player_stats` insert | `void` | Teams tab | Only if RLS is off (R5); best bowling stored as text (D6) |
 | `updatePlayerTeam(playerId, teamId \| null)` | `api/playerApi.ts` | `players` update `team_id`, returns updated ids | `void` (throws if 0 rows changed) | Teams tab (Change Team) | Only if RLS is off on `players` or an UPDATE policy is added (none exists, D18) |
@@ -244,15 +249,17 @@ GET /rest/v1/players?select=*,player_stats(*),player_ratings(batting,bowling,fie
 
 Because `player_id` is unique in both tables, PostgREST returns each as a single object (or `null`), not an array.
 
-### 4.7 Delete a team
+### 4.7 Archive a team (teams are never deleted)
 
 ```ts
-await deleteTeamInfo(teamId);
+await archiveTeam(teamId);   // restoreTeam(teamId) undoes it
 ```
 
 ```http
-DELETE /rest/v1/teams?id=eq.<teamId>
+POST /rest/v1/rpc/archive_team   { "p_team_id": "<teamId>" }
 ```
+
+- Admins only; the function raises `42501` otherwise. Players are kept and unassigned; the team row, its match history (`player_match_stats`) and awards stay. The notes below describe the old DELETE, kept for reference.
 
 - **Permission:** the only delete policy allows one hard-coded user ID. For every other user, including other admins, the request returns success and **deletes nothing** (R3).
 - **Effects when allowed:** players are kept with `team_id` set to null; captain, favourite-team and toss/winner references are cleared; `tournament_teams` rows are deleted.
