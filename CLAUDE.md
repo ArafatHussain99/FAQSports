@@ -1,138 +1,113 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository.
+Guidance for Claude Code in this repository. Keep this file short: details live in `docs/`, area-specific rules in `.claude/rules/`, and multi-step procedures in `.claude/skills/`.
 
-## 1. Project Overview
+## 1. Project
 
-- **Project name:** FAQ Sports
-- **Purpose:** Stores player data, manages scores and acts as a sports activity management tool. Each sport's scorecard can be managed in the app.
-- **Sports:** Cricket, Football, Table Tennis, Badminton, Carrom and UNO.
-  - Cricket, Football and Table Tennis are implemented.
-  - Badminton, Carrom and UNO appear on the home screen but show a "Coming Soon" alert (`app/(tabs)/index.tsx`).
-- **Target users:** Employees of FAQ.
-- **Current status:** Existing application under active development.
+**FAQ Sports** is an internal app for FAQ employees to manage players, teams, grounds, matches and scorecards. Expo (React Native) app for iOS, Android and web, with Supabase for auth and data.
 
-Read `docs/PROJECT_OVERVIEW.md` for details: roles, screens, sport status, cricket scoring rules, data model and known gaps.
+| Sport | Status |
+|-------|--------|
+| Cricket | Create match, live scoring, scorecard. **In memory only**, nothing saved to Supabase. |
+| Football | Create match only; matches aren't listed or scored. |
+| Table Tennis | Create match (singles/doubles), point-by-point scorecard with serve rotation, saved to Supabase `table_tennis_matches`. |
+| Badminton, Carrom, UNO | "Coming Soon" alert on Home. |
 
-## 2. Technology Stack
+Roles: `admin` and `player`, read from the `profiles` table. Admin checks exist only in the UI: database policies don't check the role, and users can currently set their own role to admin (`docs/DATABASE_SCHEMA.md` §7.3).
 
-- **Frontend:** React Native 0.81 + React 19 via **Expo SDK 54**, with **Expo Router** (file-based routing). Runs on iOS, Android and web (`react-native-web`).
-- **Language:** **TypeScript** (`strict: true`). Write new code as `.ts` / `.tsx`.
-- **Backend / Database / Auth:** **Supabase** (`@supabase/supabase-js`).
-- **State management:** React built-in hooks wrapped in context providers via `@nkzw/create-context-hook`, plus **TanStack React Query** for async data and `AsyncStorage` for persisted local settings. (`zustand` is installed but not used.)
-- **Styling:** Component-based styling with `StyleSheet.create` at the bottom of each file, using shared color tokens from `constants/colors.tsx` (dark theme).
-- **Icons:** `lucide-react-native` (primary), `@expo/vector-icons`.
-- **Testing:** Jest with `jest-expo` preset + `@testing-library/react-native`.
+## 2. Documentation
 
-## 3. Commands
+Read the relevant doc before changing an area, and update it when behaviour changes.
+
+| Doc | Read it when |
+|-----|--------------|
+| `docs/PROJECT_OVERVIEW.md` | Starting out: feature status, what is persisted, doc map |
+| `docs/REQUIREMENTS.md` | Adding or changing a feature; **§7 lists decided and open business rules** |
+| `docs/ARCHITECTURE.md` | Touching navigation, providers, data flow |
+| `docs/DATABASE_SCHEMA.md` | Touching any Supabase table; **§6 lists code-vs-database mismatches D1–D18; §7 has enums, delete rules, RLS policies and triggers**. Raw export: `docs/supabase-schema.sql` |
+| `docs/API_DOCUMENTATION.md` | Adding or changing functions in `api/` or `sports/*/api.ts` |
+| `docs/AUTHENTICATION.md` | Login, roles, sessions, route protection |
+| `docs/UI_UX_GUIDELINES.md` | Building UI: colours, spacing, patterns, states |
+| `docs/COMPONENTS.md` | Reusing components and context hooks |
+| `docs/BUSINESS_LOGIC.md` | Any scoring or match rule; **known defects C1–C20** |
+| `docs/TESTING.md` | Writing or running tests |
+| `docs/PROJECT_AUDIT.md` | Severity of known issues and suggested fix order |
+
+If the code doesn't answer a business rule, ask the user and record the answer in `docs/REQUIREMENTS.md` §7. Don't guess.
+
+## 3. Stack
+
+Expo SDK 54 · React Native 0.81 · React 19 · Expo Router 6 (typed routes) · TypeScript strict · Supabase (`@supabase/supabase-js`) · TanStack React Query · `@nkzw/create-context-hook` · AsyncStorage · `lucide-react-native` · Jest + `jest-expo` + React Native Testing Library. `zustand` and `@expo/vector-icons` are installed but unused.
+
+## 4. Commands
 
 ```bash
-npm install          # install dependencies (bun.lock also exists; npm is the documented default)
-npm start            # expo start
-npm run android      # expo start --android
-npm run ios          # expo start --ios
-npm run web          # expo start --web
-npm run lint         # expo lint (eslint-config-expo)
-npm test             # jest --watchAll
-npx jest __tests__/home-screen-test.tsx   # run a single test once
-npx tsc --noEmit     # type-check
+npm install                 # npm is the default (bun.lock also exists)
+npm start                   # expo start (npm run android / ios / web)
+npm run lint                # expo lint
+npx tsc --noEmit            # type-check
+npx jest --ci               # run tests once (npm test is watch mode)
+npx jest <file>             # one test file
 ```
 
-Do **not** run `npm run reset-project` — it moves the `app/` directory out and replaces it with a blank starter.
+- **Never run `npm run reset-project`.** It replaces `app/` with a blank starter. A hook blocks it.
+- Before finishing a change, run `npm run lint` and `npx tsc --noEmit`.
+- The only test currently fails (no Supabase mock); see `docs/TESTING.md` §2.
 
-## 4. Environment
+## 5. Environment
 
-Supabase project ID: `gflkukmbxjiggvobvitb` (URL `https://gflkukmbxjiggvobvitb.supabase.co`). `api/supabaseClient.ts` uses this URL by default.
+- `.env` (git-ignored) at the project root, copied from `.env.example`:
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (required; legacy `EXPO_PUBLIC_SUPABASE_ANON_KEY` is a fallback) and optional `EXPO_PUBLIC_SUPABASE_URL`. Default project: `gflkukmbxjiggvobvitb`.
+- Never commit `.env`, never hard-code or log the key, never use a secret/service_role key in the app. A hook blocks edits to `.env` files.
+- `api/supabaseClient.ts` throws at import if no key is set. Restart with `npx expo start -c` after changing `.env`.
+- Worktrees under `.claude/worktrees/` have no `.env` and no `expo-env.d.ts`, so the app won't start and `tsc` reports `Cannot find name 'process'`. Run the app and type-check from the main checkout.
 
-The client key comes from an Expo public env var in `.env` (git-ignored) at the project root. Copy `.env.example` to start:
-
-```
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Supabase → Project Settings → API Keys
-EXPO_PUBLIC_SUPABASE_URL=...                              # optional, overrides the default project URL
-```
-
-The legacy `EXPO_PUBLIC_SUPABASE_ANON_KEY` (JWT) is still read as a fallback while Supabase phases it out. Never commit `.env`, never hard-code or log the key, and never put a secret/service_role key in the app. `supabaseClient.ts` throws a clear error if no key is set. Expo inlines `EXPO_PUBLIC_*` values at bundle time, so restart with `npx expo start -c` after changing `.env`. Git worktrees under `.claude/worktrees/` don't have the `.env`; run the app from the main checkout.
-
-## 5. Project Structure
-
-Code is split into **shared** code and **per-sport** folders under `sports/`. `app/` holds routes only.
+## 6. Structure
 
 ```
-app/                          Expo Router routes ONLY (every file here becomes a URL)
-  _layout.tsx                 Root Stack + provider tree + global loading overlay
-  (tabs)/                     Bottom tabs: index (Home), matches, teams, profile, more
-  login.tsx, manage-stadiums.tsx, notification.tsx
-  player/[id].tsx, team/[id].tsx
-  cricket/                    Thin route files that re-export screens from sports/cricket
-    create-match.tsx          -> /cricket/create-match
-    live-scoring.tsx          -> /cricket/live-scoring
-    match/[id].tsx            -> /cricket/match/:id
-  football/create-match.tsx   -> /football/create-match
-  table-tennis/create-match.tsx -> /table-tennis/create-match
-
-sports/                       Everything specific to one sport lives in its folder
-  cricket/
-    screens/                  CreateMatchScreen, LiveScoringScreen, MatchDetailsScreen
-    components/               MatchCard, LiveMatchCard
-    engines/                  Scoring logic, kept out of the screen
-      scoreEngine.ts          runs, extras (wide/no-ball/bye/leg-bye), undo, haptics
-      wicketEngine.ts         dismissals
-      inningsEngine.ts        strike rotation, new bowler, innings change, match end
-    api.ts                    getMatches, uploadBallInfo (`matches`, `ball_info` tables)
-    context.tsx               CricketMatchProvider / useCricketMatches
-    constants.ts              matchTypes (long / short pitch)
-    types.ts                  CricketMatch, CricketInnings, BallEvent, ... + TypeBallInfo
-  football/
-    screens/CreateMatchScreen.tsx
-    context.tsx               FootballMatchProvider / useFootballMatches
-    types.ts                  FootballMatch, FootballEvent, ...
-  table-tennis/
-    screens/CreateMatchScreen.tsx
-
-api/                          Shared Supabase data access (not sport-specific)
-  supabaseClient.ts           single shared Supabase client
-  authApi.ts                  signUp, signIn, signOut, getCurrentUser, getUserRole
-  teamApi.ts                  getTeams, uploadTeamInfo, deleteTeamInfo
-  playerApi.ts                getPlayers, getTeamPlayers, uploadPlayerInfo, uploadPlayerStats, deletePlayerInfo
-  groundApi.ts                getGrounds, addGround
-context/AppContext.tsx        AppProvider/useApp (role, user, current sport, global loading),
-                              DataProvider/useData (players, teams, grounds, notifications)
-types/                        Shared types: index.ts (SportType, UserRole, MatchStatus, Player,
-                              Team, Tournament, Notification, ...); player.ts / team.ts hold
-                              Supabase row payload types
-constants/colors.tsx          Color tokens (incl. per-sport colors). Use these, not raw hex
-constants/theme.ts            Expo template theme (mostly unused)
-mocks/data.ts                 Mock data still used by some screens/context
-hooks/                        Color-scheme helpers
-__tests__/                    Jest tests
+app/                 Expo Router routes ONLY (thin re-exports for sport screens)
+sports/<sport>/      screens/ components/ engines/ api.ts context.tsx types.ts constants.ts
+api/                 shared Supabase access (auth, teams, players, grounds)
+context/AppContext.tsx   useApp (role, sport, global loading), useData (players, teams, grounds)
+types/               shared types; constants/colors.tsx  colour tokens
+mocks/data.ts        mock data still seeding some providers
 ```
 
-Path alias: `@/*` maps to the repo root (e.g. `import Colors from '@/constants/colors'`). Inside a sport folder, use relative imports (`../types`, `../context`); from outside, import via `@/sports/<sport>/...`.
+- Path alias `@/*` = repo root. Inside a sport folder use relative imports.
+- One sport only → `sports/<sport>/`. Shared → `api/`, `context/`, `types/`, `constants/`.
+- New screen → `sports/<sport>/screens/XScreen.tsx` + one-line route in `app/<sport>/` + register in `app/_layout.tsx`.
+- New sport → use the `add-sport` skill.
 
-**Where does new code go?**
-- Used by one sport only → `sports/<sport>/` (screens, components, engines, api, context, types).
-- Used by several sports or none (auth, teams, players, grounds) → `api/`, `context/`, `types/`, `constants/`.
-- A new screen → write it in `sports/<sport>/screens/`, then add a one-line route file in `app/<sport>/` (`export { default } from '@/sports/<sport>/screens/XScreen';`) and register it in the `<Stack>` in `app/_layout.tsx`.
-- Never put non-route files (helpers, API, engines) under `app/`: Expo Router treats them as routes.
+Full layout and diagrams: `docs/ARCHITECTURE.md`.
 
-## 6. Architecture Notes
+## 7. Rules that apply everywhere
 
-- **Provider order** (in `app/_layout.tsx`): `QueryClientProvider` → `GestureHandlerRootView` → `AppProvider` → `DataProvider` → `CricketMatchProvider` → `FootballMatchProvider` → `ActionSheetProvider`. A new sport's provider goes in this tree.
-- **New routes** must also be registered in the `<Stack>` in `app/_layout.tsx` if they need custom header/presentation options.
-- **Data access:** screens should call functions in `api/*` or `sports/<sport>/api.ts` (or the context hooks), never `supabase` directly. API functions log the error and `throw` it; callers handle it (usually via `Alert`).
-- **Supabase tables in use:** `profiles`, `matches`, `ball_info`, `teams`, `players`, `player_stats`, `grounds`.
-- **Auth & roles:** sign in via Supabase Auth, then `getUserRole` reads `profiles` to get `'admin' | 'player'`. Role, user name and current sport are persisted in `AsyncStorage` through `useApp()`.
-- **Global loading:** wrap async work with `runWithGlobalLoading(fn, message)` from `useApp()` to show the overlay.
-- **Sport switching:** `currentSport` (`SportType`) from `useApp()` drives which stats/screens are shown.
-- **Adding a sport** (e.g. badminton): create `sports/badminton/` following the cricket layout, add route files under `app/badminton/` and register them in `app/_layout.tsx`, update `SportType` in `types/index.ts`, the sports list and switch statements in `app/(tabs)/index.tsx` and `app/(tabs)/more.tsx`, and colors in `constants/colors.tsx`.
-- **Cricket scoring:** keep scoring rules in `sports/cricket/engines/*`; the screen passes state setters in via params objects (`ScoreEngineParams`, etc.). Ball events are uploaded with `uploadBallInfo` from `sports/cricket/api.ts`.
-- **Mock data migration:** parts of the app still read from `mocks/data.ts` (cricket matches in `sports/cricket/context.tsx`, notifications in `AppContext`, grounds in the football and table tennis create screens). Prefer replacing mocks with Supabase-backed data when touching those areas.
+- Screens use `api/*`, `sports/<sport>/api.ts` or context hooks, never `supabase` directly.
+- Functional components, default-export screens, `StyleSheet.create` at the bottom, colours from `@/constants/colors`, `SafeAreaView` from `react-native-safe-area-context`.
+- Guard native-only APIs (haptics) with `Platform.OS !== 'web'`.
+- `Alert.alert` with buttons does nothing on web. Don't add new confirm flows that rely on it without a web fallback.
+- Wrap network writes in `runWithGlobalLoading(fn, message)`; show success only after the write succeeds.
+- Don't change application behaviour while doing docs or refactors unless asked.
+- When replacing mock data, use Supabase-backed data (mocks: cricket matches, notifications, football/TT grounds).
 
-## 7. Conventions
+More specific rules load automatically from `.claude/rules/` when you work in `app/`, `api/`, `sports/`, or `__tests__/`.
 
-- Functional components + hooks only; default-export screen components.
-- Styles via `StyleSheet.create` in the same file; colors from `Colors`.
-- Use `SafeAreaView` from `react-native-safe-area-context`.
-- Guard native-only APIs (e.g. haptics) with `Platform.OS !== 'web'`.
-- Shared types go in `types/` (import with `@/types`); sport-specific types go in `sports/<sport>/types.ts`.
-- Run `npm run lint` and `npx tsc --noEmit` before finishing a change.
+## 8. Claude Code setup
+
+| Kind | Location | Purpose |
+|------|----------|---------|
+| Path rules | `.claude/rules/routes.md` | `app/**`: routes-only, registration, guards |
+| | `.claude/rules/ui.md` | Screens and components: tokens, states, web dialogs |
+| | `.claude/rules/data-access.md` | `api/**`, `sports/*/api.ts`, `context/**`: Supabase patterns |
+| | `.claude/rules/cricket.md` | `sports/cricket/**`: scoring rules and known defects |
+| | `.claude/rules/tests.md` | `__tests__/**`: mocks and providers |
+| Skills | `.claude/skills/add-sport/` | Add or build out a sport |
+| | `.claude/skills/add-screen/` | Add a screen or route (incl. admin screens) |
+| | `.claude/skills/update-screen/` | Change an existing screen without breaking current behaviour |
+| | `.claude/skills/add-api-function/` | Read/write a Supabase table, replace mock data |
+| | `.claude/skills/supabase-sql/` | Migrations (schema, RLS) and one-off data SQL; never run by Claude |
+| | `.claude/skills/cricket-engine-change/` | Fix defects C1–C20 or change scoring rules, test first |
+| | `.claude/skills/write-tests/` | Jest harness, mocks and tests |
+| | `.claude/skills/verify-change/` | tsc, lint, tests, diff review, docs, manual checks before "done" |
+| Agent | `.claude/agents/cricket-rules-reviewer.md` | Reviews scoring changes against `docs/BUSINESS_LOGIC.md` |
+| Hook | `.claude/hooks/guard.js` (in `.claude/settings.json`) | Blocks `reset-project` and edits to `.env` files |

@@ -10,6 +10,8 @@ import { useFootballMatches } from '@/sports/football/context';
 import { CricketMatch } from '@/sports/cricket/types';
 import LiveMatchCard from '@/sports/cricket/components/LiveMatchCard';
 import MatchCard from '@/sports/cricket/components/MatchCard';
+import { useTableTennisMatches } from '@/sports/table-tennis/context';
+import TableTennisMatchCard from '@/sports/table-tennis/components/TableTennisMatchCard';
 
 const sportIcons = [
   { id: 'cricket', name: 'Cricket', emoji: '🏏', color: Colors.cricket },
@@ -25,8 +27,10 @@ export default function HomeScreen() {
   const { role, userName, isAdmin, isOnline, isInitialized, currentSport, setCurrentSport } = useApp();
   const { liveMatch, upcomingMatches, completedMatches } = useCricketMatches();
   const { liveMatch: liveFootballMatch, upcomingMatches: upcomingFootballMatches, completedMatches: completedFootballMatches } = useFootballMatches();
+  const tableTennis = useTableTennisMatches();
   const { unreadCount, players, teams } = useData();
   const [refreshing, setRefreshing] = React.useState(false);
+  const refetchTableTennis = tableTennis.refetch;
 
   useEffect(() => {
     if (isInitialized && !role) {
@@ -36,8 +40,8 @@ export default function HomeScreen() {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetchTableTennis().finally(() => setRefreshing(false));
+  }, [refetchTableTennis]);
 
   if (!isInitialized || !role) {
     return (
@@ -199,7 +203,11 @@ export default function HomeScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Trophy size={24} color={Colors.primary} />
-            <Text style={styles.statNumber}>{currentCompletedMatches.length + (currentLiveMatch ? 1 : 0) + currentUpcomingMatches.length}</Text>
+            <Text style={styles.statNumber}>
+              {currentSport === 'table_tennis'
+                ? tableTennis.matches.length
+                : currentCompletedMatches.length + (currentLiveMatch ? 1 : 0) + currentUpcomingMatches.length}
+            </Text>
             <Text style={styles.statLabel}>Matches</Text>
           </View>
           <View style={styles.statCard}>
@@ -228,6 +236,42 @@ export default function HomeScreen() {
               ))}
             </View>
           </View>
+        )}
+
+        {currentSport === 'table_tennis' && (
+          <>
+            {tableTennis.isLoading && (
+              <Text style={styles.ttMessage}>Loading table tennis matches...</Text>
+            )}
+            {!!tableTennis.error && (
+              <TouchableOpacity onPress={() => tableTennis.refetch()}>
+                <Text style={styles.ttMessage}>Couldn&apos;t load table tennis matches. Tap to retry.</Text>
+              </TouchableOpacity>
+            )}
+            {!tableTennis.isLoading && !tableTennis.error && tableTennis.matches.length === 0 && (
+              <Text style={styles.ttMessage}>
+                No table tennis matches yet.{isAdmin ? ' Create one to start scoring.' : ''}
+              </Text>
+            )}
+            {[
+              { title: 'Live Now', items: tableTennis.liveMatches },
+              { title: 'Upcoming', items: tableTennis.upcomingMatches },
+              { title: 'Recent Results', items: tableTennis.completedMatches.slice(0, 5) },
+            ]
+              .filter(group => group.items.length > 0)
+              .map(group => (
+                <View key={group.title} style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>{group.title}</Text>
+                  </View>
+                  <View style={styles.matchesContainer}>
+                    {group.items.map(match => (
+                      <TableTennisMatchCard key={match.id} match={match} />
+                    ))}
+                  </View>
+                </View>
+              ))}
+          </>
         )}
 
         <View style={styles.section}>
@@ -291,6 +335,13 @@ const styles = StyleSheet.create({
   },
   safeTop: {
     backgroundColor: Colors.background,
+  },
+  ttMessage: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   loadingContainer: {
     flex: 1,

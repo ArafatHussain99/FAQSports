@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Calendar, MapPin, Trophy, Play, Target } from 'lucide-react-native';
 import Colors from '@/constants/colors';
@@ -87,7 +88,7 @@ export default function MatchDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['bottom']} style={styles.container}>
       <Stack.Screen options={{ title: `${teamA?.shortName} vs ${teamB?.shortName}` }} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -540,7 +541,7 @@ export default function MatchDetailScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

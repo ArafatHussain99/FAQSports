@@ -2,6 +2,7 @@ import Colors from "@/constants/colors";
 import { AppProvider, DataProvider, useApp } from "@/context/AppContext";
 import { CricketMatchProvider } from "@/sports/cricket/context";
 import { FootballMatchProvider } from "@/sports/football/context";
+import { TableTennisMatchProvider } from "@/sports/table-tennis/context";
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
@@ -40,6 +41,7 @@ function RootLayoutNav() {
 
       {/* Table Tennis */}
       <Stack.Screen name="table-tennis/create-match" options={{ title: 'Create Table Tennis Match', presentation: 'modal' }} />
+      <Stack.Screen name="table-tennis/match/[id]" options={{ title: 'Table Tennis', gestureEnabled: false }} />
       <Stack.Screen name="notification" options={{ title: 'Notifications' }} />
     </Stack>
   );
@@ -74,12 +76,14 @@ export default function RootLayout() {
           <DataProvider>
             <CricketMatchProvider>
               <FootballMatchProvider>
-                <ActionSheetProvider>
-                  <View style={{ flex: 1 }}>
-                    <RootLayoutNav />
-                    <GlobalLoadingOverlay />
-                  </View>
-                </ActionSheetProvider>
+                <TableTennisMatchProvider>
+                  <ActionSheetProvider>
+                    <View style={{ flex: 1 }}>
+                      <RootLayoutNav />
+                      <GlobalLoadingOverlay />
+                    </View>
+                  </ActionSheetProvider>
+                </TableTennisMatchProvider>
               </FootballMatchProvider>
             </CricketMatchProvider>
           </DataProvider>

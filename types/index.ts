@@ -16,6 +16,9 @@ export interface User {
 export interface Player {
   id: string;
   name: string;
+  nickname?: string;
+  /** Key of a bundled cover picture (constants/playerCovers.ts), not a URL. */
+  coverImageKey?: string;
   avatar?: string;
   teamId?: string;
   position?: string;

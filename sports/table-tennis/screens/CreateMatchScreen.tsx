@@ -1,20 +1,37 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
+import { isPermissionError, PERMISSION_ERROR_MESSAGE } from '@/api/supabaseClient';
 import Colors from '@/constants/colors';
-import { useData } from '@/context/AppContext';
-import { grounds } from '@/mocks/data';
+import { useApp, useData } from '@/context/AppContext';
+import { grounds as mockGrounds } from '@/mocks/data';
+import { useTableTennisMatches } from '../context';
+import { pointsToWinForServes } from '../engines/scoreEngine';
+import { TTFormat } from '../types';
 
 type Step = 'basics' | 'players';
 
+const BEST_OF_OPTIONS = [1, 3, 5, 7];
+const SERVES_PER_TURN_OPTIONS = [2, 5];
+// Singles follows the standard 2 serves each; doubles uses the house rule of 5.
+const defaultServesPerTurn = (format: TTFormat) => (format === 'double' ? 5 : 2);
+
 export default function CreateTableTennisMatchScreen() {
   const router = useRouter();
-  const { players } = useData();
+  const { players, grounds: dbGrounds } = useData();
+  const { isAdmin, runWithGlobalLoading } = useApp();
+  const { createMatch } = useTableTennisMatches();
+  const grounds = dbGrounds.length > 0 ? dbGrounds : mockGrounds;
 
   const [step, setStep] = useState<Step>('basics');
-  const [format, setFormat] = useState<'single' | 'double'>('single');
-  const [selectedGround, setSelectedGround] = useState(grounds[0]);
+  const [format, setFormat] = useState<TTFormat>('single');
+  const [bestOf, setBestOf] = useState(5);
+  const [servesPerTurn, setServesPerTurn] = useState(defaultServesPerTurn('single'));
+  const [selectedGround, setSelectedGround] = useState<string | null>(null);
+  const venue = selectedGround ?? grounds[0] ?? null;
+  const [error, setError] = useState<string | null>(null);
   const [playerA, setPlayerA] = useState('');
   const [playerB, setPlayerB] = useState('');
   const [partnerA, setPartnerA] = useState('');
@@ -23,7 +40,7 @@ export default function CreateTableTennisMatchScreen() {
   const canProceed = () => {
     switch (step) {
       case 'basics':
-        return format && selectedGround;
+        return !!format && bestOf > 0 && servesPerTurn > 0;
       case 'players':
         if (format === 'single') {
           return playerA && playerB && playerA !== playerB;
@@ -40,7 +57,11 @@ export default function CreateTableTennisMatchScreen() {
 
   const handleNext = () => {
     if (step === 'basics') setStep('players');
-    else if (step === 'players') handleCreateMatch();
+  };
+
+  const changeFormat = (next: TTFormat) => {
+    setFormat(next);
+    setServesPerTurn(defaultServesPerTurn(next));
   };
 
   const handleBack = () => {
@@ -48,32 +69,51 @@ export default function CreateTableTennisMatchScreen() {
     else router.back();
   };
 
-  const handleCreateMatch = () => {
-    Alert.alert(
-      'Start Match?',
-      'Do you want to start the match now or save it as upcoming?',
-      [
-        {
-          text: 'Save as Upcoming',
-          onPress: () => {
-            // Save to upcoming matches
-            router.back();
-          },
-        },
-        {
-          text: 'Start Now',
-          style: 'default',
-          onPress: () => {
-            // Start match now
-            router.back();
-          },
-        },
-      ]
-    );
+  const handleCreateMatch = async (startNow: boolean) => {
+    if (!canProceed()) return;
+    setError(null);
+    try {
+      const id = await runWithGlobalLoading(
+        () =>
+          createMatch({
+            format,
+            bestOf,
+            pointsToWin: pointsToWinForServes(servesPerTurn),
+            servesPerTurn,
+            teamA: format === 'double' ? [playerA, partnerA] : [playerA],
+            teamB: format === 'double' ? [playerB, partnerB] : [playerB],
+            venue,
+            // A started match opens on the scorecard's setup step (first server, sides).
+            status: 'upcoming',
+          }),
+        'Creating match...',
+      );
+      if (startNow) {
+        router.replace(`/table-tennis/match/${id}`);
+      } else {
+        router.back();
+      }
+    } catch (e) {
+      setError(
+        isPermissionError(e)
+          ? PERMISSION_ERROR_MESSAGE
+          : "Couldn't create the match. Check your connection and try again.",
+      );
+    }
   };
 
+  if (!isAdmin) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Stack.Screen options={{ title: 'Create Table Tennis Match' }} />
+        <Text style={styles.stepTitle}>Admins only</Text>
+        <Text style={styles.helperText}>Ask an admin to create table tennis matches.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['bottom']} style={styles.container}>
       <Stack.Screen
         options={{
           title: 'Create Table Tennis Match',
@@ -114,7 +154,7 @@ export default function CreateTableTennisMatchScreen() {
             <View style={styles.optionsRow}>
               <TouchableOpacity
                 style={[styles.optionChip, styles.optionChipWide, format === 'single' && styles.optionChipActive]}
-                onPress={() => setFormat('single')}
+                onPress={() => changeFormat('single')}
               >
                 <Text style={[styles.optionText, format === 'single' && styles.optionTextActive]}>
                   Singles
@@ -122,13 +162,49 @@ export default function CreateTableTennisMatchScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.optionChip, styles.optionChipWide, format === 'double' && styles.optionChipActive]}
-                onPress={() => setFormat('double')}
+                onPress={() => changeFormat('double')}
               >
                 <Text style={[styles.optionText, format === 'double' && styles.optionTextActive]}>
                   Doubles
                 </Text>
               </TouchableOpacity>
             </View>
+
+            <Text style={styles.label}>Best of</Text>
+            <View style={styles.optionsRow}>
+              {BEST_OF_OPTIONS.map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.optionChip, bestOf === n && styles.optionChipActive]}
+                  onPress={() => setBestOf(n)}
+                >
+                  <Text style={[styles.optionText, bestOf === n && styles.optionTextActive]}>
+                    {n === 1 ? '1 game' : `${n} games`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Serves per turn</Text>
+            <View style={styles.optionsRow}>
+              {SERVES_PER_TURN_OPTIONS.map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.optionChip, servesPerTurn === n && styles.optionChipActive]}
+                  onPress={() => setServesPerTurn(n)}
+                >
+                  <Text style={[styles.optionText, servesPerTurn === n && styles.optionTextActive]}>
+                    {n} serves
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.helperText}>
+              {format === 'double'
+                ? `Doubles: the player on the right serves ${servesPerTurn} times, swaps sides with their partner, then the other team's player on the right serves.`
+                : `Singles: service changes every ${servesPerTurn} points.`}
+              {` Games to ${pointsToWinForServes(servesPerTurn)}. At ${pointsToWinForServes(servesPerTurn) - 1}-${pointsToWinForServes(servesPerTurn) - 1} it's deuce: the first side to win 2 points in a row takes the game, and service changes every point.`}
+            </Text>
 
             <Text style={styles.label}>Venue</Text>
             <ScrollView
@@ -140,10 +216,10 @@ export default function CreateTableTennisMatchScreen() {
               {grounds.map((ground) => (
                 <TouchableOpacity
                   key={ground}
-                  style={[styles.groundChip, selectedGround === ground && styles.groundChipActive]}
+                  style={[styles.groundChip, venue === ground && styles.groundChipActive]}
                   onPress={() => setSelectedGround(ground)}
                 >
-                  <Text style={[styles.groundText, selectedGround === ground && styles.groundTextActive]}>
+                  <Text style={[styles.groundText, venue === ground && styles.groundTextActive]}>
                     {ground}
                   </Text>
                 </TouchableOpacity>
@@ -251,22 +327,42 @@ export default function CreateTableTennisMatchScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={handleBack}
-        >
-          <Text style={styles.cancelButtonText}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, !canProceed() && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed()}
-        >
-          <Text style={styles.buttonText}>{step === 'players' ? 'Create' : 'Next'}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      {step === 'basics' ? (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
+            onPress={handleBack}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, !canProceed() && styles.buttonDisabled]}
+            onPress={handleNext}
+            disabled={!canProceed()}
+          >
+            <Text style={styles.buttonText}>Next</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton, !canProceed() && styles.buttonDisabled]}
+            onPress={() => handleCreateMatch(false)}
+            disabled={!canProceed()}
+          >
+            <Text style={styles.cancelButtonText}>Save for Later</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, !canProceed() && styles.buttonDisabled]}
+            onPress={() => handleCreateMatch(true)}
+            disabled={!canProceed()}
+          >
+            <Text style={styles.buttonText}>Start Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -277,6 +373,25 @@ const styles = StyleSheet.create({
   },
   headerBtn: {
     padding: 8,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  helperText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: -8,
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  errorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.error,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   progressContainer: {
     flexDirection: 'row',

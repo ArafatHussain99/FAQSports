@@ -1,20 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
-import { Award, Target, Shield, Send, MessageCircle } from 'lucide-react-native';
+import { updatePlayerProfile } from '@/api/playerApi';
 import Colors from '@/constants/colors';
-import { useData, useApp } from '@/context/AppContext';
+import { getPlayerCover, PLAYER_COVERS } from '@/constants/playerCovers';
+import { useApp, useData } from '@/context/AppContext';
 import { Comment } from '@/types';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { Award, Ban, MessageCircle, Pencil, Send, Shield, Target, X } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const NICKNAME_MAX_LENGTH = 30;
 
 export default function PlayerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPlayerById, getTeamById } = useData();
-  const { userName } = useApp();
+  const { getPlayerById, getTeamById, refetchPlayers } = useData();
+  const { userName, isAdmin, runWithGlobalLoading } = useApp();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
 
+  // Edit profile (admin only)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNickname, setEditNickname] = useState('');
+  const [editCoverKey, setEditCoverKey] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   const player = getPlayerById(id || '');
   const team = player?.teamId ? getTeamById(player.teamId) : null;
+  const cover = getPlayerCover(player?.coverImageKey);
 
   if (!player) {
     return (
@@ -43,18 +57,91 @@ export default function PlayerProfileScreen() {
     setNewComment('');
   };
 
+  const openEditProfile = () => {
+    setEditNickname(player.nickname ?? '');
+    setEditCoverKey(player.coverImageKey ?? null);
+    setProfileError(null);
+    setIsEditing(true);
+  };
+
+  const closeEditProfile = () => {
+    if (isSavingProfile) return;
+    setIsEditing(false);
+    setProfileError(null);
+  };
+
+  const trimmedNickname = editNickname.trim();
+  const profileChanged =
+    (trimmedNickname || null) !== (player.nickname ?? null) ||
+    editCoverKey !== (player.coverImageKey ?? null);
+
+  const handleSaveProfile = async () => {
+    if (!profileChanged) return;
+
+    setIsSavingProfile(true);
+    setProfileError(null);
+    try {
+      await runWithGlobalLoading(async () => {
+        await updatePlayerProfile(player.id, {
+          nickname: trimmedNickname || null,
+          coverImageKey: editCoverKey,
+        });
+        await refetchPlayers();
+      }, 'Saving profile...');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error saving player profile:', error);
+      // Shown inside the modal so it's visible on web too (Alert.alert is a no-op there).
+      setProfileError(error instanceof Error ? error.message : 'Failed to save. Please try again.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Team colour tint behind the cover when no picture is chosen.
+  const coverFallbackColor =
+    team?.color && /^#[0-9A-Fa-f]{6}$/.test(team.color) ? `${team.color}40` : Colors.surface;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <SafeAreaView edges={['bottom']} style={styles.container}>
       <Stack.Screen options={{ title: player.name }} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.cover, { backgroundColor: coverFallbackColor }, cover && { height: 360 }]}>
+          {cover && (
+            <Image
+              source={cover.source}
+              style={styles.coverImage}
+              resizeMode="cover"
+              accessibilityLabel={`${player.name}'s cover picture`}
+            />
+          )}
+          <LinearGradient
+            colors={['transparent', Colors.card] as const}
+            style={styles.coverGradient}
+            pointerEvents="none"
+          />
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={openEditProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Edit nickname and cover picture"
+            >
+              <Pencil size={14} color={Colors.text} />
+              <Text style={styles.editProfileBtnText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{player.name.charAt(0)}</Text>
+              {<Text style={styles.avatarText}>{player.name.charAt(0)}</Text>}
             </View>
             <View style={styles.ratingBadge}>
               <Text style={styles.ratingText}>{player.ratings.overall}</Text>
@@ -62,6 +149,9 @@ export default function PlayerProfileScreen() {
           </View>
 
           <Text style={styles.playerName}>{player.name}</Text>
+          {player.nickname && (
+            <Text style={styles.playerNickname}>&ldquo;{player.nickname}&rdquo;</Text>
+          )}
           <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
 
           {team && (
@@ -261,6 +351,103 @@ export default function PlayerProfileScreen() {
           <Send size={20} color={newComment.trim() ? Colors.background : Colors.textMuted} />
         </TouchableOpacity>
       </View>
+
+      {/* Edit Profile Modal (admin only) */}
+      <Modal
+        visible={isAdmin && isEditing}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEditProfile}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle} numberOfLines={1}>Edit Profile - {player.name}</Text>
+            <TouchableOpacity
+              onPress={closeEditProfile}
+              disabled={isSavingProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <X size={24} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentPadding}>
+            <Text style={styles.label}>Nickname</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., The Wall"
+              placeholderTextColor={Colors.textMuted}
+              value={editNickname}
+              onChangeText={setEditNickname}
+              maxLength={NICKNAME_MAX_LENGTH}
+              editable={!isSavingProfile}
+              autoCapitalize="words"
+            />
+            <Text style={styles.helperText}>
+              {editNickname.length}/{NICKNAME_MAX_LENGTH} · leave empty for no nickname
+            </Text>
+
+            <Text style={[styles.label, styles.labelSpaced]}>Cover Picture</Text>
+            <View style={styles.coverGrid}>
+              <TouchableOpacity
+                style={[styles.coverOption, !editCoverKey && styles.coverOptionActive]}
+                onPress={() => setEditCoverKey(null)}
+                disabled={isSavingProfile}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: !editCoverKey }}
+                accessibilityLabel="No cover picture"
+              >
+                <View style={styles.coverOptionNone}>
+                  <Ban size={22} color={Colors.textMuted} />
+                  <Text style={styles.coverOptionNoneText}>None</Text>
+                </View>
+              </TouchableOpacity>
+              {PLAYER_COVERS.map(option => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.coverOption, editCoverKey === option.key && styles.coverOptionActive]}
+                  onPress={() => setEditCoverKey(option.key)}
+                  disabled={isSavingProfile}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: editCoverKey === option.key }}
+                  accessibilityLabel={option.label}
+                >
+                  <Image source={option.source} style={styles.coverOptionImage} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.helperText}>
+              Pictures are bundled with the app (assets/images/player-covers).
+            </Text>
+          </ScrollView>
+
+          {profileError && (
+            <Text style={styles.profileError} accessibilityRole="alert">{profileError}</Text>
+          )}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={closeEditProfile}
+              disabled={isSavingProfile}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                styles.saveButton,
+                (isSavingProfile || !profileChanged) && styles.disabledButton,
+              ]}
+              onPress={handleSaveProfile}
+              disabled={isSavingProfile || !profileChanged}
+            >
+              <Text style={styles.saveButtonText}>{isSavingProfile ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
@@ -285,14 +472,50 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 80,
   },
+  cover: {
+    height: 200,
+    overflow: 'hidden',
+  },
+  coverImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  coverGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+  },
+  editProfileBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  editProfileBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
   header: {
     alignItems: 'center',
     backgroundColor: Colors.card,
-    paddingVertical: 24,
+    paddingBottom: 24,
     paddingHorizontal: 20,
   },
   avatarContainer: {
     position: 'relative',
+    marginTop: -56,
     marginBottom: 16,
   },
   avatar: {
@@ -304,6 +527,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: Colors.primary,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playerNickname: {
+    fontSize: 15,
+    fontStyle: 'italic',
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 4,
   },
   avatarText: {
     fontSize: 40,
@@ -546,5 +781,126 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: Colors.border,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  modalContent: {
+    flex: 1,
+  },
+  modalContentPadding: {
+    padding: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  labelSpaced: {
+    marginTop: 24,
+  },
+  input: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  helperText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 6,
+  },
+  coverGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  coverOption: {
+    width: 104,
+    height: 104,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'transparent',
+    backgroundColor: Colors.surface,
+  },
+  coverOptionActive: {
+    borderColor: Colors.primary,
+  },
+  coverOptionImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverOptionNone: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  coverOptionNoneText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  profileError: {
+    color: Colors.error,
+    fontSize: 13,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: Colors.surface,
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  saveButton: {
+    backgroundColor: Colors.primary,
+  },
+  saveButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });

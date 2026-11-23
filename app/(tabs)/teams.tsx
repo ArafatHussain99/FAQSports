@@ -20,7 +20,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { deletePlayerInfo, uploadPlayerInfo, uploadPlayerStats } from '@/api/playerApi';
+import { deletePlayerInfo, updatePlayerTeam, uploadPlayerInfo, uploadPlayerStats } from '@/api/playerApi';
 import { deleteTeamInfo, uploadTeamInfo } from '@/api/teamApi';
 
 type TabType = 'teams' | 'players';
@@ -116,6 +116,12 @@ export default function TeamsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+
+  // Change Team modal state
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [isSavingTeam, setIsSavingTeam] = useState(false);
+  const [changeTeamError, setChangeTeamError] = useState<string | null>(null);
+  const teamChanged = (editingPlayer?.teamId ?? null) !== selectedTeamId;
 
   // Add Player Form State
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -273,6 +279,43 @@ export default function TeamsScreen() {
     );
   };
 
+  const openChangeTeam = (player: Player) => {
+    setEditingPlayer(player);
+    setSelectedTeamId(player.teamId ?? null);
+    setChangeTeamError(null);
+    setModalType('editPlayerTeam');
+  };
+
+  const closeChangeTeam = () => {
+    if (isSavingTeam) return;
+    setModalType(null);
+    setEditingPlayer(null);
+    setChangeTeamError(null);
+  };
+
+  const handleSaveTeam = async () => {
+    if (!editingPlayer || !teamChanged) return;
+
+    setIsSavingTeam(true);
+    setChangeTeamError(null);
+    try {
+      await runWithGlobalLoading(async () => {
+        await updatePlayerTeam(editingPlayer.id, selectedTeamId);
+        await refetchPlayers();
+      }, 'Updating team...');
+      setModalType(null);
+      setEditingPlayer(null);
+    } catch (error) {
+      console.error('Error changing player team:', error);
+      // Shown inside the modal so it is visible on web too (Alert.alert is a no-op there).
+      setChangeTeamError(
+        error instanceof Error ? error.message : 'Failed to change team. Please try again.'
+      );
+    } finally {
+      setIsSavingTeam(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
@@ -367,10 +410,10 @@ export default function TeamsScreen() {
                       <Text style={styles.playerInitial}>{player.name.charAt(0)}</Text>
                     </View>
                     <View style={styles.playerInfo}>
-                      <Text style={styles.playerName}>{player.name}</Text>
+                      <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
                       <Text style={styles.playerPosition}>{player.position || 'Player'}</Text>
                       {player.teamId && (
-                        <Text style={styles.playerTeam}>
+                        <Text style={styles.playerTeam} numberOfLines={1}>
                           {teams.find(t => t.id === player.teamId)?.name || 'Unknown'}
                         </Text>
                       )}
@@ -395,12 +438,11 @@ export default function TeamsScreen() {
                   {isAdmin && (
                     <TouchableOpacity
                       style={styles.editTeamBtn}
-                      onPress={() => {
-                        setEditingPlayer(player);
-                        setModalType('editPlayerTeam');
-                      }}
+                      onPress={() => openChangeTeam(player)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Change team for ${player.name}`}
                     >
-                      <Text style={styles.editTeamBtnText}>Team</Text>
+                      <Text style={styles.editTeamBtnText}>Change Team</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -541,13 +583,23 @@ export default function TeamsScreen() {
       </Modal>
 
       {/* Edit Player Team Modal */}
-      <Modal visible={modalType === 'editPlayerTeam'} transparent animationType="slide">
+      <Modal
+        visible={modalType === 'editPlayerTeam'}
+        transparent
+        animationType="slide"
+        onRequestClose={closeChangeTeam}
+      >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               Change Team - {editingPlayer?.name}
             </Text>
-            <TouchableOpacity onPress={() => setModalType(null)}>
+            <TouchableOpacity
+              onPress={closeChangeTeam}
+              disabled={isSavingTeam}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <X size={24} color={Colors.text} />
             </TouchableOpacity>
           </View>
@@ -556,21 +608,24 @@ export default function TeamsScreen() {
             <TouchableOpacity
               style={[
                 styles.teamListItem,
-                !editingPlayer?.teamId && styles.teamListItemActive,
+                !selectedTeamId && styles.teamListItemActive,
               ]}
-              onPress={() => editingPlayer}
+              onPress={() => setSelectedTeamId(null)}
+              disabled={isSavingTeam}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: !selectedTeamId }}
             >
               <View style={styles.teamListItemContent}>
                 <Text
                   style={[
                     styles.teamListItemText,
-                    !editingPlayer?.teamId && styles.teamListItemTextActive,
+                    !selectedTeamId && styles.teamListItemTextActive,
                   ]}
                 >
                   No Team
                 </Text>
               </View>
-              {!editingPlayer?.teamId && (
+              {!selectedTeamId && (
                 <View style={styles.checkmark} />
               )}
             </TouchableOpacity>
@@ -580,16 +635,19 @@ export default function TeamsScreen() {
                 key={team.id}
                 style={[
                   styles.teamListItem,
-                  editingPlayer?.teamId === team.id && styles.teamListItemActive,
+                  selectedTeamId === team.id && styles.teamListItemActive,
                 ]}
-                onPress={() => editingPlayer}
+                onPress={() => setSelectedTeamId(team.id)}
+                disabled={isSavingTeam}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: selectedTeamId === team.id }}
               >
                 <View style={[styles.teamListItemDot, { backgroundColor: team.color }]} />
                 <View style={styles.teamListItemContent}>
                   <Text
                     style={[
                       styles.teamListItemText,
-                      editingPlayer?.teamId === team.id && styles.teamListItemTextActive,
+                      selectedTeamId === team.id && styles.teamListItemTextActive,
                     ]}
                   >
                     {team.name}
@@ -598,19 +656,34 @@ export default function TeamsScreen() {
                     {getTeamPlayers(team.id).length} players
                   </Text>
                 </View>
-                {editingPlayer?.teamId === team.id && (
+                {selectedTeamId === team.id && (
                   <View style={styles.checkmark} />
                 )}
               </TouchableOpacity>
             ))}
           </ScrollView>
 
+          {changeTeamError && (
+            <Text style={styles.editError} accessibilityRole="alert">{changeTeamError}</Text>
+          )}
           <View style={styles.modalFooter}>
             <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
-              onPress={() => setModalType(null)}
+              style={[styles.button, styles.cancelButton]}
+              onPress={closeChangeTeam}
+              disabled={isSavingTeam}
             >
-              <Text style={styles.submitButtonText}>Done</Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.submitButton,
+                (isSavingTeam || !teamChanged) && styles.disabledButton,
+              ]}
+              onPress={handleSaveTeam}
+              disabled={isSavingTeam || !teamChanged}
+            >
+              <Text style={styles.submitButtonText}>{isSavingTeam ? 'Saving...' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -804,7 +877,6 @@ const styles = StyleSheet.create({
   },
   playerCard: {
     backgroundColor: Colors.card,
-    height: 110,
   },
   playerCardContent: {
     flexDirection: 'row',
@@ -882,7 +954,6 @@ const styles = StyleSheet.create({
   },
   swipeContainer: {
     position: 'relative',
-    height: 110,
     marginBottom: 12,
     overflow: 'hidden',
     borderRadius: 16,
@@ -899,16 +970,25 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   swipeContent: {
-    flex: 1,
     zIndex: 2,
   },
   editTeamBtn: {
+    alignSelf: 'flex-start',
     backgroundColor: Colors.primary,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginLeft: 74, // lines up with the player name (14 padding + 48 avatar + 12 gap)
+    marginBottom: 14,
+    marginTop: -4,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  editError: {
+    color: Colors.error,
+    fontSize: 13,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
   editTeamBtnText: {
     fontSize: 12,

@@ -1,9 +1,17 @@
 import { Tabs } from "expo-router";
 import { Home, Trophy, Users, User, MoreHorizontal } from "lucide-react-native";
 import React from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
+const TAB_BAR_CONTENT_HEIGHT = 60;
+
 export default function TabLayout() {
+  // Android draws edge-to-edge, so the tab bar must sit above the system
+  // navigation buttons / gesture bar (and the iOS home indicator).
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
+
   return (
     <Tabs
       screenOptions={{
@@ -14,7 +22,8 @@ export default function TabLayout() {
           borderTopColor: Colors.border,
           borderTopWidth: 1,
           paddingTop: 8,
-          height: 85,
+          paddingBottom: bottomPadding,
+          height: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
         },
         tabBarLabelStyle: {
           fontSize: 11,

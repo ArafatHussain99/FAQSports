@@ -1,122 +1,133 @@
 # FAQ Sports — Project Overview
 
+**Last updated:** 2026-11-19 (from source at commit `1f86ac9`)
+
+This is the entry point to the project docs. Everything here is derived from the code. Where the code doesn't settle a question, it is marked **Unknown** or listed as an open question in [REQUIREMENTS.md](REQUIREMENTS.md#7-open-questions).
+
+## Documentation map
+
+| Document | What it covers |
+|----------|----------------|
+| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | This page: purpose, users, feature status, where to read next. |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Functional and non-functional requirements, split into implemented, partial and planned. Open business-rule questions. |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Folder layout, provider tree, navigation, data flow, diagrams. |
+| [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | The real Supabase schema (20 tables), relationships, ER diagrams, code-vs-database mismatches. Raw export in [supabase-schema.sql](supabase-schema.sql). |
+| [API_DOCUMENTATION.md](API_DOCUMENTATION.md) | Every function in `api/` and `sports/*/api.ts`, with request examples. |
+| [AUTHENTICATION.md](AUTHENTICATION.md) | Sign-up, sign-in, roles, session handling, authorization gaps. |
+| [UI_UX_GUIDELINES.md](UI_UX_GUIDELINES.md) | Colour tokens, layout patterns, interaction patterns, known inconsistencies. |
+| [COMPONENTS.md](COMPONENTS.md) | Reusable components, context hooks and screens, with usage. |
+| [BUSINESS_LOGIC.md](BUSINESS_LOGIC.md) | Cricket scoring engines, match setup rules, stats, known rule defects. |
+| [TESTING.md](TESTING.md) | Current test setup, its state, and how to test. |
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit with severity ratings and suggested priorities. |
+
+Developer setup, commands and coding conventions are in [`CLAUDE.md`](../CLAUDE.md).
+
 ## 1. What it is
 
-FAQ Sports is an internal mobile app for **FAQ employees** that acts as a sports activity management tool. It:
+FAQ Sports is an internal app for **FAQ employees** to manage sports activity: players, teams, grounds, matches and scorecards. It is an Expo (React Native) app, so one codebase runs on **iOS, Android and web**. Supabase provides auth and the database.
 
-- stores player and team data,
-- creates and schedules matches,
-- runs live scoring and keeps each sport's scorecard,
-- tracks player stats, ratings and recent form.
-
-It is built with Expo (React Native), so the same code runs on **iOS, Android and web**. Supabase provides the backend (database and auth).
-
-**Status:** existing application under active development.
+**Status:** existing application under active development. Cricket is the most complete sport, and even cricket matches are not yet saved to the database (see [§4](#4-what-is-and-isnt-persisted)).
 
 ## 2. Users and roles
 
-Everyone signs in with email and password (Supabase Auth). Each user has a role, stored in the Supabase `profiles` table:
+Users sign in with email and password (Supabase Auth). The role is read from the `profiles` table.
 
-| Role | Can do |
-|------|--------|
-| **Player** | View matches, live scores, teams, player profiles, stats, leaderboards and notifications. |
-| **Admin** | Everything a player can, plus the **Admin Tools**: create and edit matches, manage teams and players, manage stadiums/grounds, and run live scoring. |
+| Role | What the app lets them do today |
+|------|--------------------------------|
+| **Player** | View matches, live score cards, teams, players, player profiles and notifications. |
+| **Admin** | Everything a player can, plus: create matches, run cricket live scoring, add and delete teams, add and delete players, add and remove stadiums. |
 
-The role, user name and selected sport are cached on the device, so the app opens straight into the user's last context.
+The role is only enforced in the app's UI. The database's access rules don't check it, and **any signed-in user can currently set their own role to admin**; see [AUTHENTICATION.md](AUTHENTICATION.md#5-authorization).
 
-## 3. Sports
+## 3. Feature status by sport
 
-| Sport | Status | What's built |
-|-------|--------|--------------|
-| **Cricket** | Implemented | Match creation, toss, playing XI and substitutes, full ball-by-ball live scoring, scorecards, player batting/bowling/fielding stats. |
-| **Football** | Partly built | Match creation (format, duration, lineups, substitutes), data model for goals, assists, cards and substitutions. No live-scoring screen yet. |
-| **Table Tennis** | Partly built | Match creation screen; wins/losses and points tracked in player stats. |
-| **Badminton** | Planned | Shown on the home screen as "Coming Soon". |
-| **Carrom** | Planned | Shown on the home screen as "Coming Soon". |
-| **UNO** | Planned | Shown on the home screen as "Coming Soon". |
+| Sport | Status | What exists in code |
+|-------|--------|--------------------|
+| **Cricket** | Implemented (in memory) | Create match wizard (basics, teams, toss, playing XI and substitutes), ball-by-ball live scoring, match details scorecard. |
+| **Football** | Partial | Create match wizard only. "Start Now" marks the match as current but there is no scoring screen. Created matches are not listed anywhere. |
+| **Table Tennis** | Implemented (saved) | Create match (singles/doubles, best of 1/3/5/7, serves per turn: 2 → games to 11, 5 → games to 21), point-by-point scorecard with serve rotation and undo, listed on Home. Saved to `table_tennis_matches` ([BUSINESS_LOGIC.md §7.2](BUSINESS_LOGIC.md)). |
+| **Badminton** | Planned | Shown on Home; tapping it shows a "Coming Soon" alert. |
+| **Carrom** | Planned | As above. |
+| **UNO** | Planned | As above. |
 
-The home screen has a sport switcher. The selected sport changes which stats are highlighted (runs for cricket, goals for football, wins for the other sports).
+Shared features:
 
-## 4. Main screens
+| Feature | Status |
+|---------|--------|
+| Sign in / sign up | Implemented (Supabase Auth) |
+| Teams: list, add, delete | Implemented; delete has bugs ([PROJECT_AUDIT.md §11.2](PROJECT_AUDIT.md#112-gaps)) |
+| Players: list, add | Implemented |
+| Players: delete | Broken: deletes from the wrong table |
+| Players: change team | Implemented (Change Team modal) |
+| Players: edit other fields | Not implemented |
+| Grounds (stadiums): list, add | Implemented |
+| Grounds: delete | Local only; comes back on reload |
+| Player profile: ratings, last five, comments | Ratings fixed at 50, last five empty, comments not saved |
+| Notifications | Mock data only |
+| Tournaments, Leaderboards, FAQ, Terms | Menu items with no action |
+| Sport switcher | Implemented; changes the "top players" stat on Home |
 
-**Bottom tabs**
+## 4. What is and isn't persisted
 
-- **Home** — welcome card with role badge, sport switcher, live match, upcoming matches and top players.
-- **Matches** — upcoming, live and completed matches.
-- **Teams** — teams and their squads; admins can add and edit teams and players.
-- **Profile** — the user's profile and stats, with an admin section for admins.
-- **More** — sports list, features (Tournaments, Leaderboards, Notifications), help and support, and Admin Tools.
+```mermaid
+flowchart LR
+  subgraph Supabase
+    A[Auth users]
+    P[profiles]
+    T[teams]
+    PL[players]
+    PS[player_stats]
+    G[grounds]
+    M[(matches + 7 scoring tables — exist, unused)]
+    X[(player_ratings, player_performances,<br/>notifications, tournaments — exist, unused)]
+  end
+  subgraph Device only
+    R[role, user name, sport — AsyncStorage]
+    CM[cricket and football matches — React state + mocks]
+    N[notifications — mocks]
+  end
+```
 
-**Other screens**
+- **Saved in Supabase:** auth accounts, roles (`profiles`, read only), teams, players, an initial zeroed `player_stats` row, grounds, table tennis matches and their point log (`table_tennis_matches`).
+- **Device only, lost on reload:** cricket and football matches, live scoring state, notification read flags, player comments.
+- The database already has tables for matches, squads, innings, scorecards, ball events, ratings, performances, notifications and tournaments ([DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)). The app doesn't use them yet.
+- Player stats are stored in `player_stats`, but the app reads them from `players`, so every stat shows 0 ([DATABASE_SCHEMA.md §6](DATABASE_SCHEMA.md#6-code-vs-database-mismatches), D1).
 
-- **Login** — sign in / sign up.
-- **Create Match** (cricket), **Create Football Match**, **Create Table Tennis Match**.
-- **Match Details** — scorecard and summary for one match.
-- **Live Scoring** — cricket ball-by-ball scoring for admins.
-- **Player Profile** — stats, ratings and last five performances.
-- **Team Details** — squad and captain.
-- **Manage Stadiums** — add and edit grounds.
-- **Notifications**.
+## 5. Main screens
 
-## 5. Cricket live scoring
+| Area | Screens |
+|------|---------|
+| Bottom tabs | Home, Matches, Teams, Profile, More |
+| Auth | Login (sign in / sign up toggle) |
+| Cricket | Create Match, Live Scoring, Match Details |
+| Other sports | Create Football Match, Create Table Tennis Match, Table Tennis Scorecard |
+| Details | Player Profile, Team Details |
+| Admin | Manage Stadiums |
+| Other | Notifications |
 
-Cricket is the most complete sport. The scorer can record:
+The full route table is in [ARCHITECTURE.md](ARCHITECTURE.md#4-navigation).
 
-- runs off the bat (0–6),
-- extras: wide, no-ball, bye and leg-bye,
-- wickets: bowled, caught, run out, stumped, hit wicket and retired,
-- strike rotation, new bowler at the end of each over, and bowler changes,
-- innings changes and the match result.
-
-Each innings tracks totals, extras, batsman and bowler figures, the current over and the fall of wickets. Matches can be **long** or **short** format, with a configurable number of overs. Every ball is saved to Supabase (`ball_info` table), with optional commentary.
-
-The scoring rules live in `sports/cricket/engines/` (`scoreEngine`, `wicketEngine` and `inningsEngine`), separate from the screen.
-
-## 6. Data model
-
-Supabase tables:
-
-| Table | Holds |
-|-------|-------|
-| `profiles` | User profile and role (`admin` / `player`). |
-| `teams` | Name, short name, colour, logo, captain. |
-| `players` | Name, position, batting and bowling style, team, ratings. |
-| `player_stats` | Career stats per player (cricket, football and win/loss fields). |
-| `matches` | Match records. |
-| `ball_info` | Ball-by-ball cricket events. |
-| `grounds` | Stadiums and grounds, with optional location. |
-
-Player stats cover:
-
-- **Cricket:** matches, runs, balls, wickets, catches, run-outs, stumpings, highest score, best bowling, fifties, centuries, average, strike rate and economy.
-- **Football:** goals, assists, saves, yellow and red cards.
-- **Other sports:** wins, losses, points for and points against.
-
-Players also have **ratings** (batting, bowling, fielding and overall) and a record of their last five performances.
-
-The TypeScript types for all of these are in `types/`.
-
-## 7. Technology
+## 6. Technology
 
 | Area | Choice |
 |------|--------|
-| App framework | React Native 0.81 + React 19 on Expo SDK 54 |
-| Navigation | Expo Router (file-based routes in `app/`) |
-| Language | TypeScript (strict) |
-| Backend, database, auth | Supabase |
-| State | React hooks in context providers (`@nkzw/create-context-hook`), TanStack React Query, AsyncStorage |
-| Styling | `StyleSheet` per component, shared dark-theme colours in `constants/colors.tsx` |
-| Icons | lucide-react-native |
-| Testing | Jest (`jest-expo`) + React Native Testing Library |
+| App framework | Expo SDK 54, React Native 0.81, React 19.1, react-native-web |
+| Navigation | Expo Router 6 (file-based, typed routes) |
+| Language | TypeScript, strict mode |
+| Backend | Supabase (`@supabase/supabase-js` 2.99) |
+| State | Context hooks (`@nkzw/create-context-hook`), TanStack React Query, AsyncStorage |
+| Styling | `StyleSheet.create`, dark-theme tokens in `constants/colors.tsx` |
+| Icons | `lucide-react-native` |
+| Tests | Jest (`jest-expo`) + React Native Testing Library |
 
-Code for each sport lives in its own folder under `sports/` (`cricket/`, `football/`, `table-tennis/`), and shared code lives in `api/`, `context/` and `types/`. See `CLAUDE.md` for the full folder structure, commands and coding conventions.
+## 7. Known gaps (short list)
 
-## 8. Known gaps and next steps
+The full list, with severity, is in [PROJECT_AUDIT.md](PROJECT_AUDIT.md).
 
-- **Mock data:** some screens and contexts still read from `mocks/data.ts` (matches, notifications, and the grounds list on the football and table tennis create screens). These should move to Supabase.
-- **Live scoring for other sports:** football and table tennis have create screens but no live scoring yet.
-- **New sports:** Badminton, Carrom and UNO need create screens, scoring and stats.
-- **Inconsistent "Coming soon" labels:** the More tab marks Football and Table Tennis as "Coming soon", but they can be selected on Home and have create screens.
-- **Unfinished menu items:** Tournaments, Leaderboards, FAQ and Terms of Service are not wired up yet. Tournaments already has a data type.
-- **Placeholder support email:** Contact Support uses `support@company.com`.
-- **Tests:** there is only one test (home screen), and it currently cannot run: Jest's `transformIgnorePatterns` doesn't include `@nkzw/create-context-hook`, and the Supabase env vars aren't set for tests. The scoring engines would benefit most from unit tests.
+1. Matches and ball-by-ball data are not persisted.
+2. Authorization is client-side only. Database policies don't check the admin role, and users can promote themselves to admin ([DATABASE_SCHEMA.md §7.3](DATABASE_SCHEMA.md#73-row-level-security-policies)).
+3. The Supabase session is probably not persisted on iOS/Android, and logout doesn't sign out of Supabase.
+4. Player delete targets the wrong table; team and stadium delete report success without confirming it.
+5. Several cricket scoring rule defects, including a cosmetic Undo ([BUSINESS_LOGIC.md §6](BUSINESS_LOGIC.md#6-known-defects)).
+6. Confirmation dialogs (`Alert.alert` with buttons) do nothing on web.
+7. The only test cannot run ([TESTING.md](TESTING.md)).
