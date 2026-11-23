@@ -7,13 +7,13 @@ import {
   HelpCircle, Mail, ChevronRight, Gamepad2, LucideIcon, MapPin
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 
 interface MenuItem {
   icon: LucideIcon;
   label: string;
   subtitle: string;
-  color: string;
   onPress?: () => void;
   disabled?: boolean;
   badge?: number;
@@ -33,37 +33,37 @@ export default function MoreScreen() {
     {
       title: 'Sports',
       items: [
-        { icon: Gamepad2, label: 'Cricket', subtitle: 'Matches, stats, rankings', color: Colors.cricket, onPress: () => router.push('/matches') },
-        { icon: Gamepad2, label: 'Football', subtitle: 'Coming soon', color: Colors.football, disabled: true },
-        { icon: Gamepad2, label: 'Table Tennis', subtitle: 'Coming soon', color: Colors.tableTennis, disabled: true },
-        { icon: Gamepad2, label: 'Badminton', subtitle: 'Coming soon', color: Colors.badminton, disabled: true },
+        { icon: Gamepad2, label: 'Cricket', subtitle: 'Matches, stats, rankings', onPress: () => router.push('/matches') },
+        { icon: Gamepad2, label: 'Football', subtitle: 'Coming soon', disabled: true },
+        { icon: Gamepad2, label: 'Table Tennis', subtitle: 'Coming soon', disabled: true },
+        { icon: Gamepad2, label: 'Badminton', subtitle: 'Coming soon', disabled: true },
       ],
     },
     {
       title: 'Features',
       items: [
-        { icon: Trophy, label: 'Tournaments', subtitle: 'View all tournaments', color: Colors.primary, onPress: () => { } },
-        { icon: BarChart3, label: 'Leaderboards', subtitle: 'Top performers', color: Colors.secondary, onPress: () => { } },
-        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', color: Colors.accent, badge: unreadCount, onPress: () => router.push('../notification') },
+        { icon: Trophy, label: 'Tournaments', subtitle: 'View all tournaments', onPress: () => { } },
+        { icon: BarChart3, label: 'Leaderboards', subtitle: 'Top performers', onPress: () => { } },
+        { icon: Bell, label: 'Notifications', subtitle: unreadCount > 0 ? `${unreadCount} unread` : 'All caught up', badge: unreadCount, onPress: () => router.push('../notification') },
       ],
     },
     {
-      title: 'Help & Support',
+      title: 'Help and support',
       items: [
-        { icon: HelpCircle, label: 'FAQ', subtitle: 'Common questions', color: Colors.info, onPress: () => { } },
-        { icon: Mail, label: 'Contact Support', subtitle: 'Get help', color: Colors.cricket, onPress: () => Linking.openURL('mailto:support@company.com') },
-        { icon: FileText, label: 'Terms of Service', subtitle: 'Read our terms', color: Colors.textMuted, onPress: () => { } },
+        { icon: HelpCircle, label: 'FAQ', subtitle: 'Common questions', onPress: () => { } },
+        { icon: Mail, label: 'Contact Support', subtitle: 'Get help', onPress: () => Linking.openURL('mailto:support@company.com') },
+        { icon: FileText, label: 'Terms of Service', subtitle: 'Read our terms', onPress: () => { } },
       ],
     },
   ];
 
   if (isAdmin) {
     menuSections.splice(1, 0, {
-      title: 'Admin Tools',
+      title: 'Admin tools',
       items: [
-        { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', color: Colors.adminBadge, onPress: () => router.push('/cricket/create-match') },
-        { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', color: Colors.primary, onPress: () => router.push('/teams') },
-        { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', color: Colors.secondary, onPress: () => router.push('/manage-stadiums') },
+        { icon: Trophy, label: 'Manage Matches', subtitle: 'Create and edit matches', onPress: () => router.push('/cricket/create-match') },
+        { icon: Users, label: 'Manage Teams', subtitle: 'Add teams and players', onPress: () => router.push('/teams') },
+        { icon: MapPin, label: 'Manage Stadiums', subtitle: 'Add and edit grounds', onPress: () => router.push('/manage-stadiums') },
       ],
     });
   }
@@ -84,7 +84,7 @@ export default function MoreScreen() {
         {menuSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.menuContainer}>
+            <View style={styles.group}>
               {section.items.map((item, itemIndex) => (
                 <TouchableOpacity
                   key={itemIndex}
@@ -92,23 +92,22 @@ export default function MoreScreen() {
                   onPress={item.onPress}
                   disabled={item.disabled}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !!item.disabled }}
                 >
-                  <View style={[styles.menuIcon, { backgroundColor: `${item.color}20` }]}>
-                    <item.icon size={20} color={item.color} />
-                  </View>
-                  <View style={styles.menuContent}>
-                    <Text style={[styles.menuLabel, item.disabled && styles.menuLabelDisabled]}>
-                      {item.label}
-                    </Text>
-                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                  </View>
-                  {item.badge && item.badge > 0 ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.badge}</Text>
+                  <item.icon size={20} color={Colors.textSecondary} />
+                  <View style={[styles.menuContent, itemIndex > 0 && styles.menuContentRuled]}>
+                    <View style={styles.menuText}>
+                      <Text style={styles.menuLabel}>{item.label}</Text>
+                      <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                     </View>
-                  ) : (
-                    <ChevronRight size={18} color={Colors.textMuted} />
-                  )}
+                    {item.badge && item.badge > 0 ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.badge}</Text>
+                      </View>
+                    ) : null}
+                    <ChevronRight size={20} color={Colors.textMuted} />
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -116,7 +115,7 @@ export default function MoreScreen() {
         ))}
 
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Company Sports Portal v1.0.0</Text>
+          <Text style={styles.versionText}>FAQ Sports v1.0.0</Text>
         </View>
       </ScrollView>
     </View>
@@ -132,89 +131,89 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700' as const,
+    ...Type.largeTitle,
     color: Colors.text,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Space.xl,
     paddingBottom: 100,
   },
   section: {
-    marginBottom: 24,
+    marginTop: Space.xxl,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    marginBottom: Space.sm,
+    paddingHorizontal: Space.lg,
   },
-  menuContainer: {
+  group: {
     backgroundColor: Colors.card,
-    borderRadius: 16,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingLeft: Space.lg,
+    gap: Space.md,
   },
   menuItemDisabled: {
-    opacity: 0.5,
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    opacity: 0.4,
   },
   menuContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    minHeight: Touch,
+    paddingVertical: Space.sm,
+    paddingRight: Space.md,
+  },
+  menuContentRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  menuText: {
+    flex: 1,
   },
   menuLabel: {
-    fontSize: 15,
-    fontWeight: '600' as const,
+    ...Type.body,
     color: Colors.text,
-    marginBottom: 2,
-  },
-  menuLabelDisabled: {
-    color: Colors.textMuted,
   },
   menuSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   badge: {
+    minWidth: 22,
+    alignItems: 'center',
     backgroundColor: Colors.live,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '700' as const,
-    color: Colors.text,
+    ...Type.caption,
+    fontVariant: ['tabular-nums'],
+    color: Colors.textInverse,
   },
   versionContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: Space.xxl,
   },
   versionText: {
-    fontSize: 12,
+    ...Type.footnote,
     color: Colors.textMuted,
   },
 });

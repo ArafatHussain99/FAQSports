@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
+import { Hairline, Space, Type } from '@/constants/tokens';
 import { useApp } from '@/context/AppContext';
 import { useCricketMatches } from '@/sports/cricket/context';
 import LiveMatchCard from '@/sports/cricket/components/LiveMatchCard';
@@ -30,6 +31,17 @@ export default function MatchesScreen() {
     { key: 'completed', label: 'Completed', count: completedMatches.length },
   ];
 
+  const scheduleHint = isAdmin
+    ? 'Tap + to schedule a match.'
+    : 'Ask an admin to schedule a match.';
+
+  const renderEmpty = (title: string, subtitle: string) => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptySubtitle}>{subtitle}</Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
@@ -39,34 +51,36 @@ export default function MatchesScreen() {
             <TouchableOpacity
               style={styles.addBtn}
               onPress={() => router.push('/cricket/create-match')}
+              accessibilityRole="button"
+              accessibilityLabel="Create match"
             >
-              <Plus size={20} color={Colors.text} />
+              <Plus size={22} color={Colors.text} />
             </TouchableOpacity>
           )}
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContainer}
-        >
-          {filters.map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
-              onPress={() => setFilter(f.key)}
-            >
-              <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
-                {f.label}
-              </Text>
-              <View style={[styles.filterCount, filter === f.key && styles.filterCountActive]}>
-                <Text style={[styles.filterCountText, filter === f.key && styles.filterCountTextActive]}>
-                  {f.count}
+        <View style={styles.segmentRow} accessibilityRole="tablist">
+          {filters.map((f) => {
+            const selected = filter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.segment, selected && styles.segmentSelected]}
+                onPress={() => setFilter(f.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${f.label}, ${f.count}`}
+              >
+                <Text
+                  style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                  numberOfLines={1}
+                >
+                  {f.label} <Text style={styles.segmentCount}>{f.count}</Text>
                 </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </SafeAreaView>
 
       <ScrollView
@@ -79,48 +93,40 @@ export default function MatchesScreen() {
       >
         {(filter === 'all' || filter === 'live') && liveMatch && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🔴 Live Now</Text>
+            <Text style={styles.sectionTitle}>Live now</Text>
             <LiveMatchCard match={liveMatch} />
           </View>
         )}
 
         {(filter === 'all' || filter === 'upcoming') && upcomingMatches.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📅 Upcoming Matches</Text>
-            <View style={styles.matchesContainer}>
-              {upcomingMatches.map((match) => (
-                <MatchCard key={match.id} match={match} />
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>Upcoming</Text>
+            {upcomingMatches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
           </View>
         )}
 
         {(filter === 'all' || filter === 'completed') && completedMatches.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>✅ Completed Matches</Text>
-            <View style={styles.matchesContainer}>
-              {completedMatches.map((match) => (
-                <MatchCard key={match.id} match={match} />
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>Completed</Text>
+            {completedMatches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
           </View>
         )}
 
-        {filter === 'live' && !liveMatch && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🏏</Text>
-            <Text style={styles.emptyTitle}>No Live Matches</Text>
-            <Text style={styles.emptySubtitle}>Check back later or view upcoming matches</Text>
-          </View>
-        )}
+        {filter === 'all' && !liveMatch && upcomingMatches.length === 0 && completedMatches.length === 0 &&
+          renderEmpty('No matches yet', scheduleHint)}
 
-        {filter === 'upcoming' && upcomingMatches.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📅</Text>
-            <Text style={styles.emptyTitle}>No Upcoming Matches</Text>
-            <Text style={styles.emptySubtitle}>Schedule a new match to get started</Text>
-          </View>
-        )}
+        {filter === 'live' && !liveMatch &&
+          renderEmpty('Nothing live right now', 'Pull down to refresh, or check the Upcoming tab for the next match.')}
+
+        {filter === 'upcoming' && upcomingMatches.length === 0 &&
+          renderEmpty('No upcoming matches', scheduleHint)}
+
+        {filter === 'completed' && completedMatches.length === 0 &&
+          renderEmpty('No completed matches', 'Results appear here once a match is finished.')}
       </ScrollView>
     </View>
   );
@@ -138,102 +144,80 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...Type.largeTitle,
     color: Colors.text,
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primary,
+    marginRight: -Space.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filtersContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 10,
-  },
-  filterChip: {
+  segmentRow: {
     flexDirection: 'row',
+    marginHorizontal: Space.xl,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 44,
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    gap: 8,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -Hairline,
   },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
+  segmentSelected: {
+    borderBottomColor: Colors.ink,
   },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
+  segmentText: {
+    ...Type.subhead,
     color: Colors.textSecondary,
   },
-  filterTextActive: {
-    color: Colors.background,
-  },
-  filterCount: {
-    backgroundColor: Colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  filterCountActive: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  filterCountText: {
-    fontSize: 12,
+  segmentTextSelected: {
     fontWeight: '700',
-    color: Colors.textMuted,
+    color: Colors.text,
   },
-  filterCountTextActive: {
-    color: Colors.background,
+  segmentCount: {
+    fontVariant: ['tabular-nums'],
+    color: Colors.textMuted,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
+    paddingHorizontal: Space.xl,
     paddingBottom: 100,
   },
   section: {
-    marginBottom: 24,
+    marginTop: Space.section,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  matchesContainer: {
-    paddingHorizontal: 16,
+    ...Type.title,
+    color: Colors.text,
+    marginBottom: Space.sm,
   },
   emptyState: {
+    paddingTop: Space.section * 2,
+    paddingHorizontal: Space.lg,
     alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 40,
-  },
-  emptyEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...Type.headline,
     color: Colors.text,
-    marginBottom: 8,
+    marginBottom: Space.xs,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textMuted,
+    ...Type.subhead,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
 });

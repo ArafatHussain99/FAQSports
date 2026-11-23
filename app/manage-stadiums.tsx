@@ -1,9 +1,10 @@
-import React, { use, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
-import { Check, X, Plus, Trash2 } from 'lucide-react-native';
+import { X, Trash2 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
 import { addGround, getGrounds } from '@/api/groundApi';
 
@@ -85,30 +86,36 @@ export default function ManageStadiumsScreen() {
         options={{
           title: 'Manage Stadiums',
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-              <X size={24} color={Colors.text} />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <X size={22} color={Colors.text} />
             </TouchableOpacity>
           ),
         }}
       />
 
       {isLoading ? (
-        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={styles.loading}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={{ marginTop: 12, color: Colors.textMuted }}>Loading stadiums...</Text>
+          <Text style={styles.loadingText}>Loading stadiums...</Text>
         </View>
       ) : <SafeAreaView edges={['bottom']} style={styles.safeArea}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Add Stadium Form */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Add New Stadium</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">Add a stadium</Text>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Stadium Name *</Text>
+          <View style={styles.form}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Stadium name</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter stadium name"
@@ -116,11 +123,14 @@ export default function ManageStadiumsScreen() {
                 value={groundName}
                 onChangeText={setGroundName}
                 editable={!isLoading}
+                accessibilityLabel="Stadium name, required"
               />
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Location (Optional)</Text>
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                Location <Text style={styles.optional}>(optional)</Text>
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter location"
@@ -128,57 +138,51 @@ export default function ManageStadiumsScreen() {
                 value={location}
                 onChangeText={setLocation}
                 editable={!isLoading}
+                accessibilityLabel="Location, optional"
               />
             </View>
 
             <TouchableOpacity
-              style={[styles.addButton, isLoading && styles.addButtonDisabled]}
+              style={[styles.primaryButton, isLoading && styles.disabled]}
               onPress={handleAddGround}
               disabled={isLoading}
+              activeOpacity={0.8}
+              accessibilityRole="button"
             >
-              {(
-                <>
-                  <Plus size={18} color={Colors.background} />
-                  <Text style={styles.addButtonText}>Add Stadium</Text>
-                </>
-              )}
+              <Text style={styles.primaryButtonText}>Add Stadium</Text>
             </TouchableOpacity>
           </View>
 
           {/* Stadiums List */}
-          <View style={styles.listSection}>
-            <Text style={styles.sectionTitle}>
-              Existing Stadiums ({grounds.length})
-            </Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]} accessibilityRole="header">
+            Stadiums ({grounds.length})
+          </Text>
 
-            {grounds.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>No stadiums added yet</Text>
-              </View>
-            ) : (
-              <View style={styles.stadiumsList}>
-                {grounds.map((ground, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.stadiumItem,
-                      index === grounds.length - 1 && styles.stadiumItemLast,
-                    ]}
+          {grounds.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No stadiums yet</Text>
+              <Text style={styles.emptyText}>
+                Enter a stadium name above and tap Add Stadium to list it here.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {grounds.map((ground, index) => (
+                <View key={index} style={styles.row}>
+                  <Text style={styles.rowText} numberOfLines={2}>{ground}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteGround(ground)}
+                    style={styles.deleteButton}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${ground}`}
                   >
-                    <View style={styles.stadiumContent}>
-                      <Text style={styles.stadiumName}>{ground}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteGround(ground)}
-                      style={styles.deleteButton}
-                    >
-                      <Trash2 size={18} color={Colors.live} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+                    <Trash2 size={20} color={Colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>}
     </View>
@@ -194,105 +198,118 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerBtn: {
-    padding: 8,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    marginTop: Space.md,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingBottom: 40,
-  },
-  formSection: {
-    marginBottom: 32,
-  },
-  listSection: {
-    marginBottom: 20,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.xl,
+    paddingBottom: Space.xxxl + Space.sm,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: Space.sm,
   },
-  formGroup: {
-    marginBottom: 16,
+  sectionTitleSpaced: {
+    marginTop: Space.section,
+  },
+  form: {
+    gap: Space.md,
+  },
+  field: {
+    gap: Space.sm,
   },
   label: {
-    fontSize: 14,
+    ...Type.subhead,
     fontWeight: '600',
+    color: Colors.text,
+  },
+  optional: {
+    fontWeight: '400',
     color: Colors.textSecondary,
-    marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.text,
+    // Type.body without lineHeight: a fixed lineHeight misaligns TextInput text on iOS.
+    fontSize: Type.body.fontSize,
+    fontWeight: Type.body.fontWeight,
+    height: Touch,
+    backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    color: Colors.text,
   },
-  addButton: {
-    flexDirection: 'row',
+  primaryButton: {
+    height: Touch,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginTop: 8,
-    gap: 8,
+    borderRadius: Radius.md,
+    marginTop: Space.xs,
   },
-  addButtonDisabled: {
-    opacity: 0.6,
+  disabled: {
+    opacity: 0.4,
   },
-  addButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.background,
+  primaryButtonText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
-  stadiumsList: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    overflow: 'hidden',
+  list: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
-  stadiumItem: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    minHeight: Touch + Space.sm,
+    gap: Space.md,
+    borderBottomWidth: Hairline,
     borderBottomColor: Colors.border,
   },
-  stadiumItemLast: {
-    borderBottomWidth: 0,
-  },
-  stadiumContent: {
-    flex: 1,
-  },
-  stadiumName: {
-    fontSize: 16,
-    fontWeight: '600',
+  rowText: {
+    ...Type.bodyStrong,
     color: Colors.text,
+    flex: 1,
+    paddingVertical: Space.md,
   },
   deleteButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: -Space.md,
   },
   emptyState: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderTopWidth: Hairline,
+    borderBottomWidth: Hairline,
+    borderColor: Colors.border,
+    paddingVertical: Space.xxl,
+    gap: Space.xs,
   },
-  emptyStateText: {
-    fontSize: 16,
-    color: Colors.textMuted,
-    fontWeight: '500',
+  emptyTitle: {
+    ...Type.headline,
+    color: Colors.text,
+  },
+  emptyText: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
   },
 });

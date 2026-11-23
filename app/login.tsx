@@ -1,8 +1,8 @@
 import { getUserRole, signIn, signUp } from '@/api/authApi';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp } from '@/context/AppContext';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Lock, Mail, Trophy, User } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -70,105 +70,97 @@ export default function LoginScreen() {
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
-              <View style={styles.logoContainer}>
-                <Trophy size={48} color={Colors.primary} />
-              </View>
-              <Text style={styles.title}>Company Sports Portal</Text>
-              <Text style={styles.subtitle}>Manage matches, track scores, and compete</Text>
+              <Text style={styles.title} accessibilityRole="header">FAQ Sports</Text>
+              <Text style={styles.subtitle}>Matches, scores and players for FAQ.</Text>
             </View>
 
-            {/* Tab Selector */}
-            <View style={styles.tabContainer}>
+            {/* Sign in / sign up segmented control */}
+            <View style={styles.segment} accessibilityRole="tablist">
               <TouchableOpacity
-                style={[styles.tab, !isSignUp && styles.tabActive]}
+                style={[styles.segmentItem, !isSignUp && styles.segmentItemActive]}
                 onPress={() => setIsSignUp(false)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: !isSignUp }}
               >
-                <Text style={[styles.tabText, !isSignUp && styles.tabTextActive]}>Sign In</Text>
+                <Text style={[styles.segmentText, !isSignUp && styles.segmentTextActive]}>Sign In</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, isSignUp && styles.tabActive]}
+                style={[styles.segmentItem, isSignUp && styles.segmentItemActive]}
                 onPress={() => setIsSignUp(true)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isSignUp }}
               >
-                <Text style={[styles.tabText, isSignUp && styles.tabTextActive]}>Sign Up</Text>
+                <Text style={[styles.segmentText, isSignUp && styles.segmentTextActive]}>Sign Up</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.formContainer}>
+            <View style={styles.form}>
               {/* Full Name - Only for Sign Up */}
               {isSignUp && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Full Name</Text>
-                  <View style={styles.inputWrapper}>
-                    <User size={18} color={Colors.textMuted} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter your full name"
-                      placeholderTextColor={Colors.textMuted}
-                      value={fullName}
-                      onChangeText={setFullName}
-                      autoCapitalize="words"
-                      editable={!isLoading}
-                    />
-                  </View>
+                <View style={styles.field}>
+                  <Text style={styles.label}>Full name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your full name"
+                    placeholderTextColor={Colors.textMuted}
+                    value={fullName}
+                    onChangeText={setFullName}
+                    autoCapitalize="words"
+                    editable={!isLoading}
+                    accessibilityLabel="Full name"
+                  />
                 </View>
               )}
 
               {/* Email */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <View style={styles.inputWrapper}>
-                  <Mail size={18} color={Colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your email"
-                    placeholderTextColor={Colors.textMuted}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!isLoading}
-                  />
-                </View>
+              <View style={styles.field}>
+                <Text style={styles.label}>Email address</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  placeholderTextColor={Colors.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                  accessibilityLabel="Email address"
+                />
               </View>
 
               {/* Password */}
-              <View style={styles.inputGroup}>
+              <View style={styles.field}>
                 <Text style={styles.label}>Password</Text>
-                <View style={styles.inputWrapper}>
-                  <Lock size={18} color={Colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your password"
-                    placeholderTextColor={Colors.textMuted}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    editable={!isLoading}
-                  />
-                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your password"
+                  placeholderTextColor={Colors.textMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  editable={!isLoading}
+                  accessibilityLabel="Password"
+                />
               </View>
             </View>
 
             <TouchableOpacity
-              style={[
-                styles.authButton,
-                isLoading && styles.authButtonDisabled,
-              ]}
+              style={[styles.primaryButton, isLoading && styles.disabled]}
               onPress={handleAuthenticate}
               disabled={isLoading}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isLoading, busy: isLoading }}
             >
               {isLoading ? (
-                <ActivityIndicator color={Colors.background} size="small" />
+                <ActivityIndicator color={Colors.onPrimary} size="small" />
               ) : (
-                <>
-                  <Text style={styles.authText}>
-                    {isSignUp ? 'Create Account' : 'Sign In'}
-                  </Text>
-                  <ChevronRight size={20} color={Colors.background} />
-                </>
+                <Text style={styles.primaryButtonText}>
+                  {isSignUp ? 'Create Account' : 'Sign In'}
+                </Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -191,105 +183,84 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 24,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.xxxl * 2,
+    paddingBottom: Space.xxl,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: Space.xxxl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...Type.largeTitle,
     color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: Space.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 24,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  tabActive: {
-    backgroundColor: Colors.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  tabTextActive: {
-    color: Colors.background,
-  },
-  formContainer: {
-    marginBottom: 24,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.body,
     color: Colors.textSecondary,
-    marginBottom: 8,
   },
-  inputWrapper: {
+  segment: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
+    marginBottom: Space.xxl,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
+  segmentItem: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
+    minHeight: Touch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -Hairline,
+  },
+  segmentItemActive: {
+    borderBottomColor: Colors.ink,
+  },
+  segmentText: {
+    ...Type.bodyStrong,
+    color: Colors.textSecondary,
+  },
+  segmentTextActive: {
     color: Colors.text,
   },
-  authButton: {
-    flexDirection: 'row',
+  form: {
+    gap: Space.lg,
+    marginBottom: Space.xxl,
+  },
+  field: {
+    gap: Space.sm,
+  },
+  label: {
+    ...Type.subhead,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  input: {
+    // Type.body without lineHeight: a fixed lineHeight misaligns TextInput text on iOS.
+    fontSize: Type.body.fontSize,
+    fontWeight: Type.body.fontWeight,
+    height: Touch,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    color: Colors.text,
+  },
+  primaryButton: {
+    height: Touch,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    gap: 8,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.xxl,
   },
-  authButtonDisabled: {
-    opacity: 0.6,
+  disabled: {
+    opacity: 0.4,
   },
-  authText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.background,
+  primaryButtonText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
 });

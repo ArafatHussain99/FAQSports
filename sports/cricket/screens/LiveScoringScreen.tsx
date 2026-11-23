@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, Button, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { X, RotateCcw, ArrowLeftRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
 import { useCricketMatches } from '../context';
 import { BallEvent, CricketMatch } from '../types';
@@ -13,19 +14,19 @@ import { handleInningsEnd, selectNewBowler, swapStrike, handleEndMatch as inning
 import { handleWicket } from '../engines/wicketEngine';
 
 const runButtons = [
-  { value: 0, label: '0', color: Colors.border },
-  { value: 1, label: '1', color: Colors.surface },
-  { value: 2, label: '2', color: Colors.surface },
-  { value: 3, label: '3', color: Colors.surface },
-  { value: 4, label: '4', color: Colors.secondary },
-  { value: 6, label: '6', color: Colors.primary },
+  { value: 0, label: '0', boundary: false },
+  { value: 1, label: '1', boundary: false },
+  { value: 2, label: '2', boundary: false },
+  { value: 3, label: '3', boundary: false },
+  { value: 4, label: '4', boundary: true },
+  { value: 6, label: '6', boundary: true },
 ];
 
 const extraButtons = [
-  { type: 'wide' as const, label: 'Wide', color: Colors.warning },
-  { type: 'no_ball' as const, label: 'No Ball', color: Colors.warning },
-  { type: 'bye' as const, label: 'Bye', color: Colors.warning },
-  { type: 'leg_bye' as const, label: 'Leg Bye', color: Colors.warning },
+  { type: 'wide' as const, label: 'Wide' },
+  { type: 'no_ball' as const, label: 'No ball' },
+  { type: 'bye' as const, label: 'Bye' },
+  { type: 'leg_bye' as const, label: 'Leg bye' },
 ];
 
 export default function LiveScoringScreen() {
@@ -191,8 +192,9 @@ export default function LiveScoringScreen() {
       <View style={styles.container}>
         <SafeAreaView style={styles.errorContainer}>
           <Text style={styles.errorText}>No active match</Text>
+          <Text style={styles.errorHint}>Start a match from Home to score it here.</Text>
           <TouchableOpacity style={styles.errorBtn} onPress={() => router.back()}>
-            <Text style={styles.errorBtnText}>Go Back</Text>
+            <Text style={styles.errorBtnText}>Go back</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </View>
@@ -214,16 +216,18 @@ export default function LiveScoringScreen() {
     <View style={styles.container}>
       <Modal visible={showExtraRunsInput} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Enter additional runs</Text>
+          <View style={[styles.modalContainer, { paddingBottom: Space.xl + insets.bottom }]}>
+            <Text style={styles.modalTitle}>Additional runs</Text>
+            <Text style={styles.modalHint}>Runs taken on top of the extra.</Text>
 
             <TextInput
               keyboardType="numeric"
               value={extraRunsInput}
               onChangeText={setExtraRunsInput}
-              placeholder="Runs"
+              placeholder="0"
               style={styles.modalInput}
-              placeholderTextColor={Colors.textSecondary}
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
             />
 
             <TouchableOpacity
@@ -240,113 +244,142 @@ export default function LiveScoringScreen() {
                 setExtraType(null);
               }}
             >
-              <Text>Add Runs</Text>
+              <Text style={styles.modalBtnText}>Add runs</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       <SafeAreaView edges={['top']} style={styles.header}>
-        <TouchableOpacity onPress={handleEndMatchCallback} style={styles.closeBtn}>
+        <TouchableOpacity
+          onPress={handleEndMatchCallback}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel="End match"
+        >
           <X size={24} color={Colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
-            {battingTeam?.shortName} vs {bowlingTeam?.shortName}
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {battingTeam?.shortName} v {bowlingTeam?.shortName}
           </Text>
           <View style={styles.liveTag}>
             <View style={styles.liveDot} />
             <Text style={styles.liveText}>LIVE</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleUndoCallback} style={styles.undoBtn}>
-          <RotateCcw size={20} color={Colors.text} />
+        <TouchableOpacity
+          onPress={handleUndoCallback}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Undo last ball"
+        >
+          <RotateCcw size={22} color={Colors.text} />
         </TouchableOpacity>
       </SafeAreaView>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.scoreBoard}>
-          <Text style={styles.teamName}>{battingTeam?.name}</Text>
+          <View style={styles.teamLine}>
+            {battingTeam && <View style={[styles.pin, { backgroundColor: battingTeam.color }]} />}
+            <Text style={styles.teamName} numberOfLines={1}>{battingTeam?.name}</Text>
+          </View>
           <View style={styles.mainScore}>
             <Text style={styles.runs}>{currentInnings.runs}</Text>
             <Text style={styles.wickets}>/{currentInnings.wickets}</Text>
           </View>
           <Text style={styles.overs}>
-            ({currentInnings.overs}.{currentInnings.balls} / {currentMatch.totalOvers} ov)
-          </Text>
-          <Text style={styles.crr}>
-            CRR: {((currentInnings.runs / (currentInnings.overs + currentInnings.balls / 6)) || 0).toFixed(2)}
-          </Text>
-        </View>
-
-        <View style={styles.playersContainer}>
-          <View style={styles.batsmenRow}>
-            <View style={[styles.playerCard, styles.strikerCard]}>
-              <View style={styles.strikerBadge}>
-                <Text style={styles.strikerBadgeText}>*</Text>
-              </View>
-              <Text style={styles.playerName}>{striker?.name || 'Select'}</Text>
-              <Text style={styles.playerStats}>
-                {strikerScore?.runs || 0} ({strikerScore?.balls || 0})
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.swapBtn} onPress={swapStrikeCallback}>
-              <ArrowLeftRight size={18} color={Colors.primary} />
-            </TouchableOpacity>
-            <View style={styles.playerCard}>
-              <Text style={styles.playerName}>{nonStriker?.name || 'Select'}</Text>
-              <Text style={styles.playerStats}>
-                {nonStrikerScore?.runs || 0} ({nonStrikerScore?.balls || 0})
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.bowlerCard}>
-            <Text style={styles.bowlerLabel}>Bowler</Text>
-            <Text style={styles.playerName}>{bowler?.name || 'Select'}</Text>
-            <Text style={styles.playerStats}>
-              {bowlerStats?.overs || 0}.{bowlerStats?.balls || 0} - {bowlerStats?.runs || 0} -{' '}
-              {bowlerStats?.wickets || 0}
+            {currentInnings.overs}.{currentInnings.balls} of {currentMatch.totalOvers} overs
+            <Text style={styles.crr}>
+              {'   '}Run rate {((currentInnings.runs / (currentInnings.overs + currentInnings.balls / 6)) || 0).toFixed(2)}
             </Text>
-            <TouchableOpacity
-              style={styles.changeBowlerBtn}
-              onPress={() =>
-                selectNewBowlerCallback({
-                  innings: { ...currentMatch.innings[currentMatch.currentInnings - 1] },
-                  updatedMatch: currentMatch,
-                  bowlingPlayers:
-                    currentMatch.currentInnings === 1
-                      ? currentMatch.playingXI_B.map((p: string) => {
-                        return getPlayerById(p);
-                      })
-                      : currentMatch.playingXI_A.map((p: string) => {
-                        return getPlayerById(p);
-                      }),
-                })
-              }
-            >
-              <Text style={styles.changeBowlerText}>Change Bowler</Text>
-            </TouchableOpacity>
-          </View>
+          </Text>
         </View>
 
-        <View style={styles.thisOver}>
-          <Text style={styles.thisOverLabel}>This Over</Text>
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>Batting</Text>
+          <View style={[styles.playerRow, styles.strikerRow]}>
+            <Text style={styles.strikerMark}>*</Text>
+            <Text style={styles.playerName} numberOfLines={1}>{striker?.name || 'Select'}</Text>
+            <Text style={styles.playerRuns}>{strikerScore?.runs || 0}</Text>
+            <Text style={styles.playerBalls}>({strikerScore?.balls || 0})</Text>
+          </View>
+          <View style={styles.playerRow}>
+            <Text style={styles.strikerMarkEmpty}> </Text>
+            <Text style={styles.playerName} numberOfLines={1}>{nonStriker?.name || 'Select'}</Text>
+            <Text style={styles.playerRuns}>{nonStrikerScore?.runs || 0}</Text>
+            <Text style={styles.playerBalls}>({nonStrikerScore?.balls || 0})</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.textBtn}
+            onPress={swapStrikeCallback}
+            accessibilityRole="button"
+            accessibilityLabel="Swap strike"
+          >
+            <ArrowLeftRight size={18} color={Colors.primary} />
+            <Text style={styles.textBtnText}>Swap strike</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>Bowling</Text>
+          <View style={styles.playerRow}>
+            <Text style={styles.strikerMarkEmpty}> </Text>
+            <Text style={styles.playerName} numberOfLines={1}>{bowler?.name || 'Select'}</Text>
+            <Text style={styles.bowlerFigures}>
+              {bowlerStats?.overs || 0}.{bowlerStats?.balls || 0}-{bowlerStats?.runs || 0}-{bowlerStats?.wickets || 0}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.textBtn}
+            accessibilityRole="button"
+            onPress={() =>
+              selectNewBowlerCallback({
+                innings: { ...currentMatch.innings[currentMatch.currentInnings - 1] },
+                updatedMatch: currentMatch,
+                bowlingPlayers:
+                  currentMatch.currentInnings === 1
+                    ? currentMatch.playingXI_B.map((p: string) => {
+                      return getPlayerById(p);
+                    })
+                    : currentMatch.playingXI_A.map((p: string) => {
+                      return getPlayerById(p);
+                    }),
+              })
+            }
+          >
+            <Text style={styles.textBtnText}>Change bowler</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.block}>
+          <Text style={styles.blockLabel}>This over</Text>
           <View style={styles.ballsRow}>
-            {lastBalls.slice(-6).map((ball, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.ballItem,
-                  ball.isWicket && styles.ballWicket,
-                  ball.extraType && styles.ballExtra,
-                ]}
-              >
-                <Text style={styles.ballText}>
-                  {ball.isWicket ? 'W' : ball.extraType ? `${ball.runs}${ball.extraType === 'wide' ? 'Wd' : 'Nb'}` : ball.runs}
-                </Text>
-              </View>
-            ))}
+            {lastBalls.length === 0 && <Text style={styles.noBalls}>No balls bowled yet</Text>}
+            {lastBalls.slice(-6).map((ball, i) => {
+              const isBoundary = !ball.isWicket && !ball.extraType && (ball.runs === 4 || ball.runs === 6);
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.ballItem,
+                    isBoundary && styles.ballBoundary,
+                    ball.extraType && styles.ballExtra,
+                    ball.isWicket && styles.ballWicket,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.ballText,
+                      (isBoundary || ball.isWicket) && styles.ballTextInverse,
+                      ball.extraType && !ball.isWicket && styles.ballTextExtra,
+                    ]}
+                  >
+                    {ball.isWicket ? 'W' : ball.extraType ? `${ball.runs}${ball.extraType === 'wide' ? 'Wd' : 'Nb'}` : ball.runs}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
@@ -356,10 +389,12 @@ export default function LiveScoringScreen() {
           {runButtons.map((btn) => (
             <TouchableOpacity
               key={btn.value}
-              style={[styles.runBtn, { backgroundColor: btn.color }]}
+              style={[styles.runBtn, btn.boundary && styles.runBtnBoundary]}
               onPress={() => handleScoreCallback(btn.value)}
+              accessibilityRole="button"
+              accessibilityLabel={`${btn.value} ${btn.value === 1 ? 'run' : 'runs'}`}
             >
-              <Text style={styles.runBtnText}>{btn.label}</Text>
+              <Text style={[styles.runBtnText, btn.boundary && styles.runBtnTextBoundary]}>{btn.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -367,27 +402,22 @@ export default function LiveScoringScreen() {
           {extraButtons.map((btn) => (
             <TouchableOpacity
               key={btn.type}
-              style={[styles.extraBtn, { backgroundColor: btn.color }]}
+              style={styles.extraBtn}
               onPress={() => handleExtraCallback(btn.type)}
+              accessibilityRole="button"
             >
-              <Text style={[styles.extraBtnText]}>{btn.label}</Text>
+              <Text style={styles.extraBtnText}>{btn.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <View style={styles.outRow}>
-          <TouchableOpacity
-            style={[styles.extraBtn, { backgroundColor: Colors.error }]}
-            onPress={() => handleWicketCallback()}
-          >
-            <Text style={[styles.extraBtnText, styles.outBtnText]}>OUT</Text>
-          </TouchableOpacity>
-        </View>
-        <Modal visible={false} animationType="slide">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text>Modal Content</Text>
-            <Button title="Close" />
-          </View>
-        </Modal>
+        <TouchableOpacity
+          style={styles.outBtn}
+          onPress={() => handleWicketCallback()}
+          accessibilityRole="button"
+          accessibilityLabel="Wicket"
+        >
+          <Text style={styles.outBtnText}>OUT</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     </View>
   );
@@ -402,290 +432,345 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: Space.xl,
   },
   errorText: {
-    fontSize: 18,
+    ...Type.title,
+    color: Colors.text,
+  },
+  errorHint: {
+    ...Type.subhead,
     color: Colors.textSecondary,
-    marginBottom: 16,
+    marginTop: Space.xs,
+    textAlign: 'center',
   },
   errorBtn: {
+    marginTop: Space.xl,
+    minHeight: Touch,
+    paddingHorizontal: Space.xxl,
+    borderRadius: Radius.md,
     backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    justifyContent: 'center',
   },
   errorBtnText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.background,
-  },
-
-  modalTitle: {
-    color: Colors.text,
-    fontWeight: '700' as const,
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    backgroundColor: Colors.scrim,
   },
-
   modalContainer: {
-    width: '80%',
-    backgroundColor: Colors.border,
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.xl,
   },
-
-  modalInput: {
-    borderWidth: 1,
-    borderColor: Colors.text,
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 8,
+  modalTitle: {
+    ...Type.title,
     color: Colors.text,
   },
-
-  modalBtn: {
-    backgroundColor: Colors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  modalHint: {
+    ...Type.subhead,
+    color: Colors.textSecondary,
+    marginTop: Space.xxs,
   },
-
+  modalInput: {
+    ...Type.scoreM,
+    color: Colors.text,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    height: 56,
+    paddingHorizontal: Space.lg,
+    marginTop: Space.lg,
+  },
+  modalBtn: {
+    marginTop: Space.md,
+    height: Touch + 4,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Space.sm,
+    paddingBottom: Space.xs,
     backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
+    borderBottomWidth: Hairline,
     borderBottomColor: Colors.border,
   },
-  closeBtn: {
-    padding: 8,
+  iconBtn: {
+    width: Touch,
+    height: Touch,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
+    ...Type.headline,
     color: Colors.text,
+    flexShrink: 1,
   },
   liveTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: Space.xs,
+    borderWidth: 1,
+    borderColor: Colors.live,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
   },
   liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.live,
-    marginRight: 6,
   },
   liveText: {
-    fontSize: 11,
-    fontWeight: '700' as const,
+    ...Type.tag,
     color: Colors.live,
-    letterSpacing: 1,
-  },
-  undoBtn: {
-    padding: 8,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: Space.xl,
+    paddingBottom: Space.xl,
   },
   scoreBoard: {
+    paddingTop: Space.lg,
+    paddingBottom: Space.md,
+  },
+  teamLine: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
+    gap: Space.sm,
+  },
+  pin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   teamName: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
+    ...Type.headline,
+    color: Colors.text,
+    flexShrink: 1,
   },
   mainScore: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   runs: {
-    fontSize: 64,
-    fontWeight: '700' as const,
+    ...Type.scoreXL,
+    fontSize: 72,
+    lineHeight: 78,
     color: Colors.text,
   },
   wickets: {
-    fontSize: 32,
-    fontWeight: '600' as const,
+    ...Type.scoreL,
     color: Colors.textSecondary,
   },
   overs: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    marginTop: 4,
+    ...Type.subhead,
+    fontWeight: '600',
+    color: Colors.text,
+    fontVariant: ['tabular-nums'],
   },
   crr: {
-    fontSize: 14,
-    color: Colors.primary,
-    marginTop: 8,
-    fontWeight: '600' as const,
-  },
-  playersContainer: {
-    marginBottom: 16,
-  },
-  batsmenRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  playerCard: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-  },
-  strikerCard: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  strikerBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  strikerBadgeText: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-  },
-  swapBtn: {
-    padding: 8,
-  },
-  playerName: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  playerStats: {
-    fontSize: 12,
+    fontWeight: '500',
     color: Colors.textSecondary,
   },
-  changeBowlerBtn: {
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
+  block: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+    paddingTop: Space.sm,
+    paddingBottom: Space.xs,
   },
-  changeBowlerText: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.background,
+  blockLabel: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    marginBottom: Space.xxs,
   },
-  bowlerCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    minHeight: 40,
+    paddingVertical: Space.sm,
+    paddingHorizontal: Space.sm,
+    marginHorizontal: -Space.sm,
+    borderRadius: Radius.xs,
+  },
+  strikerRow: {
+    backgroundColor: Colors.highlight,
+  },
+  strikerMark: {
+    ...Type.headline,
+    width: 16,
+    color: Colors.onHighlight,
+  },
+  strikerMarkEmpty: {
+    ...Type.headline,
+    width: 16,
+  },
+  playerName: {
+    ...Type.headline,
+    color: Colors.text,
+    flex: 1,
+  },
+  playerRuns: {
+    ...Type.scoreM,
+    color: Colors.text,
+  },
+  playerBalls: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    width: 44,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  bowlerFigures: {
+    ...Type.number,
+    fontSize: 18,
+    color: Colors.text,
+  },
+  textBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Space.xs + 2,
+    minHeight: 44,
   },
-  bowlerLabel: {
-    fontSize: 10,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  thisOver: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-  },
-  thisOverLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginBottom: 12,
+  textBtnText: {
+    ...Type.subhead,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   ballsRow: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  ballItem: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+    paddingVertical: Space.sm,
+    minHeight: 56,
     alignItems: 'center',
   },
-  ballWicket: {
-    backgroundColor: Colors.error,
+  noBalls: {
+    ...Type.subhead,
+    color: Colors.textMuted,
+  },
+  ballItem: {
+    minWidth: 40,
+    height: 40,
+    paddingHorizontal: Space.xs,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ballBoundary: {
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
   },
   ballExtra: {
-    backgroundColor: Colors.warning,
+    borderColor: Colors.warning,
+  },
+  ballWicket: {
+    backgroundColor: Colors.live,
+    borderColor: Colors.live,
   },
   ballText: {
-    fontSize: 12,
-    fontWeight: '700' as const,
+    ...Type.number,
+    fontSize: 14,
     color: Colors.text,
+  },
+  ballTextInverse: {
+    color: Colors.textInverse,
+  },
+  ballTextExtra: {
+    color: Colors.warning,
   },
   scoringPad: {
     backgroundColor: Colors.surface,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
+    borderTopWidth: Hairline,
     borderTopColor: Colors.border,
+    paddingHorizontal: Space.md,
+    paddingTop: Space.md,
+    gap: Space.sm,
   },
   runsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+    gap: Space.sm,
   },
   runBtn: {
     flex: 1,
-    height: 56,
-    borderRadius: 14,
-    justifyContent: 'center',
+    height: 60,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.ink,
+    backgroundColor: Colors.card,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  runBtnBoundary: {
+    backgroundColor: Colors.ink,
   },
   runBtnText: {
-    fontSize: 22,
-    fontWeight: '700' as const,
+    ...Type.scoreM,
     color: Colors.text,
+  },
+  runBtnTextBoundary: {
+    color: Colors.textInverse,
   },
   extrasRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: Space.sm,
   },
-
-  outRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-
   extraBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
+    height: Touch,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    backgroundColor: Colors.card,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   extraBtnText: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.background,
+    ...Type.subhead,
+    fontWeight: '700',
+    color: Colors.warning,
+  },
+  outBtn: {
+    height: 52,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.live,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Space.md,
   },
   outBtnText: {
-    color: Colors.text,
+    ...Type.headline,
+    fontSize: 18,
+    letterSpacing: 1.5,
+    color: Colors.textInverse,
   },
 });

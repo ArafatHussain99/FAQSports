@@ -2,11 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import {
-  User, Shield, LogOut, ChevronRight, Trophy,
-  Target, Award, TrendingUp, Settings
-} from 'lucide-react-native';
+import { User, LogOut, ChevronRight, Trophy, Award, Settings } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useApp, useData } from '@/context/AppContext';
 
 export default function ProfileScreen() {
@@ -34,12 +32,41 @@ export default function ProfileScreen() {
     );
   };
 
+  const initial = userName.trim().charAt(0).toUpperCase() || '?';
+
+  const stats = currentPlayer
+    ? [
+      { label: 'Matches', value: currentPlayer.stats.matches },
+      { label: 'Runs', value: currentPlayer.stats.runs },
+      { label: 'Wickets', value: currentPlayer.stats.wickets },
+      { label: 'Rating', value: currentPlayer.ratings.overall },
+    ]
+    : [];
+
+  const ratings = currentPlayer
+    ? [
+      { label: 'Batting', value: currentPlayer.ratings.batting },
+      { label: 'Bowling', value: currentPlayer.ratings.bowling },
+      { label: 'Fielding', value: currentPlayer.ratings.fielding },
+    ]
+    : [];
+
+  const adminActions = [
+    { icon: Trophy, title: 'Create Match', subtitle: 'Set up a new cricket match', onPress: () => router.push('/cricket/create-match') },
+    { icon: User, title: 'Manage Players', subtitle: 'Add or edit player profiles', onPress: undefined },
+    { icon: Award, title: 'Tournaments', subtitle: 'Create and manage tournaments', onPress: undefined },
+  ];
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <TouchableOpacity style={styles.settingsBtn}>
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
             <Settings size={22} color={Colors.text} />
           </TouchableOpacity>
         </View>
@@ -50,111 +77,82 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <User size={40} color={Colors.primary} />
-            </View>
-            <View style={[styles.roleBadgeProfile, { backgroundColor: isAdmin ? Colors.adminBadge : Colors.playerBadge }]}>
-              {isAdmin ? <Shield size={12} color={Colors.text} /> : <User size={12} color={Colors.text} />}
+        <View style={styles.identity}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarInitial}>{initial}</Text>
+          </View>
+          <View style={styles.identityText}>
+            <Text style={styles.profileName} numberOfLines={2}>{userName}</Text>
+            <View style={[styles.roleTag, { backgroundColor: isAdmin ? Colors.adminBadge : Colors.playerBadge }]}>
+              <Text style={styles.roleTagText}>{isAdmin ? 'ADMINISTRATOR' : 'PLAYER'}</Text>
             </View>
           </View>
-          <Text style={styles.profileName}>{userName}</Text>
-          <Text style={styles.profileRole}>{isAdmin ? 'Administrator' : 'Player'}</Text>
         </View>
 
         {!isAdmin && currentPlayer && (
           <>
             <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Trophy size={24} color={Colors.primary} />
-                <Text style={styles.statValue}>{currentPlayer.stats.matches}</Text>
-                <Text style={styles.statLabel}>Matches</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Target size={24} color={Colors.secondary} />
-                <Text style={styles.statValue}>{currentPlayer.stats.runs}</Text>
-                <Text style={styles.statLabel}>Runs</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Award size={24} color={Colors.accent} />
-                <Text style={styles.statValue}>{currentPlayer.stats.wickets}</Text>
-                <Text style={styles.statLabel}>Wickets</Text>
-              </View>
-              <View style={styles.statCard}>
-                <TrendingUp size={24} color={Colors.cricket} />
-                <Text style={styles.statValue}>{currentPlayer.ratings.overall}</Text>
-                <Text style={styles.statLabel}>Rating</Text>
-              </View>
+              {stats.map((stat, index) => (
+                <View
+                  key={stat.label}
+                  style={[
+                    styles.statCell,
+                    index % 2 === 1 && styles.statCellRight,
+                    index >= 2 && styles.statCellBottom,
+                  ]}
+                >
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              ))}
             </View>
 
-            <View style={styles.ratingsSection}>
-              <Text style={styles.sectionTitle}>Skill Ratings</Text>
-              <View style={styles.ratingItem}>
-                <Text style={styles.ratingLabel}>Batting</Text>
-                <View style={styles.ratingBarBg}>
-                  <View style={[styles.ratingBar, { width: `${currentPlayer.ratings.batting}%`, backgroundColor: Colors.primary }]} />
+            <Text style={styles.sectionTitle}>Skill ratings</Text>
+            <View style={styles.card}>
+              {ratings.map((rating) => (
+                <View key={rating.label} style={styles.ratingItem}>
+                  <Text style={styles.ratingLabel}>{rating.label}</Text>
+                  <View style={styles.ratingTrack}>
+                    <View style={[styles.ratingBar, { width: `${rating.value}%` }]} />
+                  </View>
+                  <Text style={styles.ratingValue}>{rating.value}</Text>
                 </View>
-                <Text style={styles.ratingValue}>{currentPlayer.ratings.batting}</Text>
-              </View>
-              <View style={styles.ratingItem}>
-                <Text style={styles.ratingLabel}>Bowling</Text>
-                <View style={styles.ratingBarBg}>
-                  <View style={[styles.ratingBar, { width: `${currentPlayer.ratings.bowling}%`, backgroundColor: Colors.secondary }]} />
-                </View>
-                <Text style={styles.ratingValue}>{currentPlayer.ratings.bowling}</Text>
-              </View>
-              <View style={styles.ratingItem}>
-                <Text style={styles.ratingLabel}>Fielding</Text>
-                <View style={styles.ratingBarBg}>
-                  <View style={[styles.ratingBar, { width: `${currentPlayer.ratings.fielding}%`, backgroundColor: Colors.accent }]} />
-                </View>
-                <Text style={styles.ratingValue}>{currentPlayer.ratings.fielding}</Text>
-              </View>
+              ))}
             </View>
           </>
         )}
 
         {isAdmin && (
-          <View style={styles.adminSection}>
-            <Text style={styles.sectionTitle}>Admin Actions</Text>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/cricket/create-match')}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: `${Colors.primary}20` }]}>
-                <Trophy size={20} color={Colors.primary} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>Create Match</Text>
-                <Text style={styles.menuSubtitle}>Set up a new cricket match</Text>
-              </View>
-              <ChevronRight size={20} color={Colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: `${Colors.secondary}20` }]}>
-                <User size={20} color={Colors.secondary} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>Manage Players</Text>
-                <Text style={styles.menuSubtitle}>Add or edit player profiles</Text>
-              </View>
-              <ChevronRight size={20} color={Colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: `${Colors.accent}20` }]}>
-                <Award size={20} color={Colors.accent} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>Tournaments</Text>
-                <Text style={styles.menuSubtitle}>Create and manage tournaments</Text>
-              </View>
-              <ChevronRight size={20} color={Colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+          <>
+            <Text style={styles.sectionTitle}>Admin actions</Text>
+            <View style={styles.group}>
+              {adminActions.map((action, index) => (
+                <TouchableOpacity
+                  key={action.title}
+                  style={styles.menuItem}
+                  onPress={action.onPress}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                >
+                  <action.icon size={20} color={Colors.textSecondary} />
+                  <View style={[styles.menuContent, index > 0 && styles.menuContentRuled]}>
+                    <View style={styles.menuText}>
+                      <Text style={styles.menuTitle}>{action.title}</Text>
+                      <Text style={styles.menuSubtitle}>{action.subtitle}</Text>
+                    </View>
+                    <ChevronRight size={20} color={Colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
         )}
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          accessibilityRole="button"
+        >
           <LogOut size={20} color={Colors.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
@@ -175,19 +173,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...Type.largeTitle,
     color: Colors.text,
   },
   settingsBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
+    marginRight: -Space.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -195,161 +192,167 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Space.xl,
     paddingBottom: 100,
   },
-  profileCard: {
+  identity: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
+    gap: Space.lg,
+    paddingVertical: Space.lg,
   },
   avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.surface,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.primary,
   },
-  roleBadgeProfile: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.card,
+  avatarInitial: {
+    ...Type.title,
+    color: Colors.ink,
+  },
+  identityText: {
+    flex: 1,
+    alignItems: 'flex-start',
+    gap: Space.xs + 2,
   },
   profileName: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 4,
   },
-  profileRole: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+  roleTag: {
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 2,
+  },
+  roleTagText: {
+    ...Type.tag,
+    color: Colors.ink,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  statCard: {
-    width: '48%',
     backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    marginTop: Space.md,
+    overflow: 'hidden',
+  },
+  statCell: {
+    width: '50%',
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  statCellRight: {
+    borderLeftWidth: Hairline,
+    borderLeftColor: Colors.border,
+  },
+  statCellBottom: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Type.scoreL,
     color: Colors.text,
   },
   statLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  ratingsSection: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 16,
+    marginTop: Space.section,
+    marginBottom: Space.sm,
+  },
+  card: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
   },
   ratingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    minHeight: 40,
   },
   ratingLabel: {
-    width: 70,
-    fontSize: 13,
+    ...Type.subhead,
+    width: 72,
     color: Colors.textSecondary,
   },
-  ratingBarBg: {
+  ratingTrack: {
     flex: 1,
-    height: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 4,
-    marginHorizontal: 12,
+    height: 4,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 2,
+    marginHorizontal: Space.md,
     overflow: 'hidden',
   },
   ratingBar: {
     height: '100%',
-    borderRadius: 4,
+    backgroundColor: Colors.ink,
   },
   ratingValue: {
-    width: 30,
-    fontSize: 14,
-    fontWeight: '600',
+    ...Type.number,
+    width: 32,
     color: Colors.text,
     textAlign: 'right',
   },
-  adminSection: {
-    marginBottom: 20,
+  group: {
+    backgroundColor: Colors.card,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-  menuIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+    paddingLeft: Space.lg,
+    gap: Space.md,
   },
   menuContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: Touch,
+    paddingVertical: Space.sm,
+    paddingRight: Space.md,
+  },
+  menuContentRuled: {
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+  },
+  menuText: {
+    flex: 1,
   },
   menuTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.body,
     color: Colors.text,
-    marginBottom: 2,
   },
   menuSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: `${Colors.error}15`,
-    borderRadius: 14,
-    padding: 16,
-    gap: 10,
-    marginTop: 10,
+    gap: Space.sm,
+    minHeight: Touch,
+    borderWidth: 1,
+    borderColor: Colors.error,
+    borderRadius: Radius.md,
+    marginTop: Space.section,
   },
   logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...Type.headline,
     color: Colors.error,
   },
 });

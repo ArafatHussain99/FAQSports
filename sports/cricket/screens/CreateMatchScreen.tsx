@@ -4,12 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Touch, Type } from '@/constants/tokens';
 import { useData } from '@/context/AppContext';
 import { matchTypes } from '../constants';
 import { useCricketMatches } from '../context';
 import { CricketMatch, CricketMatchType, TossDecision, Substitute } from '../types';
 
 type Step = 'basics' | 'teams' | 'toss' | 'players';
+
+const STEPS: Step[] = ['basics', 'teams', 'toss', 'players'];
 
 export default function CreateMatchScreen() {
   const router = useRouter();
@@ -303,60 +306,121 @@ export default function CreateMatchScreen() {
     }
   };
 
+
+  const stepIndex = STEPS.indexOf(step);
+  const proceed = !!canProceed();
+
+  const renderTeamOption = (
+    team: { id: string; name: string; color: string },
+    selected: boolean,
+    disabled: boolean,
+    onPress: () => void,
+  ) => (
+    <TouchableOpacity
+      key={team.id}
+      style={[styles.row, selected && styles.rowSelected, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected, disabled }}
+    >
+      <View style={[styles.pin, { backgroundColor: team.color }]} />
+      <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+        {team.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderPlayerRow = (
+    key: string,
+    name: string,
+    selected: boolean,
+    onPress: () => void,
+    options: { multi?: boolean; meta?: string; sub?: string } = {},
+  ) => (
+    <TouchableOpacity
+      key={key}
+      style={[styles.row, selected && styles.rowSelected]}
+      onPress={onPress}
+      accessibilityRole={options.multi ? 'checkbox' : 'radio'}
+      accessibilityState={options.multi ? { checked: selected } : { selected }}
+    >
+      {options.multi && (
+        <View style={[styles.checkBox, selected && styles.checkBoxSelected]}>
+          {selected && <Check size={14} color={Colors.textInverse} strokeWidth={3} />}
+        </View>
+      )}
+      <View style={styles.rowMain}>
+        <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+          {name}
+        </Text>
+        {!!options.sub && (
+          <Text style={[styles.rowMeta, selected && styles.rowMetaSelected]}>{options.sub}</Text>
+        )}
+      </View>
+      {!!options.meta && (
+        <Text style={[styles.rowMeta, selected && styles.rowMetaSelected]}>{options.meta}</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <Stack.Screen
         options={{
           title: 'Create Cricket Match',
           headerLeft: () => (
-            <TouchableOpacity onPress={handleBack} style={styles.headerBtn}>
-              <X size={24} color={Colors.text} />
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={8}
+            >
+              <X size={22} color={Colors.text} />
             </TouchableOpacity>
           ),
         }}
       />
 
       <View style={styles.progressContainer}>
-        {['basics', 'teams', 'toss', 'players'].map((s, i) => (
-          <View key={s} style={styles.progressItem}>
-            <View style={[
-              styles.progressDot,
-              step === s && styles.progressDotActive,
-              ['basics', 'teams', 'toss', 'players'].indexOf(step) > i && styles.progressDotCompleted,
-            ]}>
-              {['basics', 'teams', 'toss', 'players'].indexOf(step) > i && (
-                <Check size={12} color={Colors.background} />
-              )}
-            </View>
-            {i < 3 && <View style={[
-              styles.progressLine,
-              ['basics', 'teams', 'toss', 'players'].indexOf(step) > i && styles.progressLineActive,
-            ]} />}
-          </View>
-        ))}
+        <Text style={styles.progressText}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <View style={styles.progressRule}>
+          {STEPS.map((s, i) => (
+            <View
+              key={s}
+              style={[styles.progressSegment, i <= stepIndex && styles.progressSegmentDone]}
+            />
+          ))}
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {step === 'basics' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Match Details</Text>
+          <View>
+            <Text style={styles.stepTitle}>Match details</Text>
 
-            <Text style={styles.label}>Match Type</Text>
-            <View style={styles.optionsRow}>
-              {matchTypes.map((match) => (
-                <TouchableOpacity
-                  key={match.key}
-                  style={[styles.optionChip, styles.optionChipWide, matchType === match.key && styles.optionChipActive]}
-                  onPress={() => setMatchType(match.key)}
-                >
-                  <Text style={[styles.optionText, matchType === match.key && styles.optionTextActive]}>
-                    {match.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={styles.label}>Match type</Text>
+            <View style={styles.chipRow}>
+              {matchTypes.map((match) => {
+                const selected = matchType === match.key;
+                return (
+                  <TouchableOpacity
+                    key={match.key}
+                    style={[styles.chip, styles.chipWide, selected && styles.chipSelected]}
+                    onPress={() => setMatchType(match.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                      {match.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <Text style={styles.label}>Total Players in Each Team</Text>
+            <Text style={styles.label}>Players in each team</Text>
             <TextInput
               style={styles.input}
               value={totalPlayersEachSide}
@@ -366,7 +430,7 @@ export default function CreateMatchScreen() {
               placeholderTextColor={Colors.textMuted}
             />
 
-            <Text style={styles.label}>Total Overs</Text>
+            <Text style={styles.label}>Total overs</Text>
             <TextInput
               style={styles.input}
               value={totalOvers}
@@ -377,123 +441,86 @@ export default function CreateMatchScreen() {
             />
 
             <Text style={styles.label}>Ground</Text>
-            <View style={styles.selectContainer}>
-              {grounds.map((ground) => (
-                <TouchableOpacity
-                  key={ground}
-                  style={[styles.selectItem, selectedGround === ground && styles.selectItemActive]}
-                  onPress={() => setSelectedGround(ground)}
-                >
-                  <Text style={[styles.selectText, selectedGround === ground && styles.selectTextActive]}>
-                    {ground}
-                  </Text>
-                  {selectedGround === ground && <Check size={18} color={Colors.primary} />}
-                </TouchableOpacity>
-              ))}
+            <View style={styles.list}>
+              {grounds.map((ground) => {
+                const selected = selectedGround === ground;
+                return (
+                  <TouchableOpacity
+                    key={ground}
+                    style={[styles.row, selected && styles.rowSelected]}
+                    onPress={() => setSelectedGround(ground)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{ground}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         )}
 
         {step === 'teams' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Teams</Text>
+          <View>
+            <Text style={styles.stepTitle}>Select teams</Text>
 
             <Text style={styles.label}>Team A</Text>
-            <View style={styles.teamSelectContainer}>
-              {teams.map((team) => (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[
-                    styles.teamCard,
-                    teamA === team.id && styles.teamCardActive,
-                    teamB === team.id && styles.teamCardDisabled,
-                  ]}
-                  onPress={() => teamB !== team.id && setTeamA(team.id)}
-                  disabled={teamB === team.id}
-                >
-                  <View style={[styles.teamLogo, { backgroundColor: team.color }]}>
-                    <Text style={styles.teamInitials}>{team.shortName}</Text>
-                  </View>
-                  <Text style={styles.teamCardName}>{team.name}</Text>
-                  {teamA === team.id && (
-                    <View style={styles.checkBadge}>
-                      <Check size={14} color={Colors.text} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+            <View style={styles.list}>
+              {teams.map((team) =>
+                renderTeamOption(
+                  team,
+                  teamA === team.id,
+                  teamB === team.id,
+                  () => teamB !== team.id && setTeamA(team.id),
+                ),
+              )}
             </View>
 
             <Text style={styles.label}>Team B</Text>
-            <View style={styles.teamSelectContainer}>
-              {teams.map((team) => (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[
-                    styles.teamCard,
-                    teamB === team.id && styles.teamCardActive,
-                    teamA === team.id && styles.teamCardDisabled,
-                  ]}
-                  onPress={() => teamA !== team.id && setTeamB(team.id)}
-                  disabled={teamA === team.id}
-                >
-                  <View style={[styles.teamLogo, { backgroundColor: team.color }]}>
-                    <Text style={styles.teamInitials}>{team.shortName}</Text>
-                  </View>
-                  <Text style={styles.teamCardName}>{team.name}</Text>
-                  {teamB === team.id && (
-                    <View style={styles.checkBadge}>
-                      <Check size={14} color={Colors.text} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+            <View style={styles.list}>
+              {teams.map((team) =>
+                renderTeamOption(
+                  team,
+                  teamB === team.id,
+                  teamA === team.id,
+                  () => teamA !== team.id && setTeamB(team.id),
+                ),
+              )}
             </View>
           </View>
         )}
 
         {step === 'toss' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Toss Details</Text>
+          <View>
+            <Text style={styles.stepTitle}>Toss details</Text>
 
-            <Text style={styles.label}>Toss Winner</Text>
-            <View style={styles.tossOptions}>
-              {[teamAData, teamBData].filter(Boolean).map((team) => (
-                <TouchableOpacity
-                  key={team!.id}
-                  style={[styles.tossCard, tossWinner === team!.id && styles.tossCardActive]}
-                  onPress={() => setTossWinner(team!.id)}
-                >
-                  <View style={[styles.tossTeamLogo, { backgroundColor: team!.color }]}>
-                    <Text style={styles.tossTeamInitials}>{team!.shortName}</Text>
-                  </View>
-                  <Text style={styles.tossTeamName}>{team!.name}</Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={styles.label}>Toss winner</Text>
+            <View style={styles.list}>
+              {[teamAData, teamBData].filter(Boolean).map((team) =>
+                renderTeamOption(team!, tossWinner === team!.id, false, () => setTossWinner(team!.id)),
+              )}
             </View>
 
             {tossWinner && (
               <>
-                <Text style={styles.label}>Toss Decision</Text>
-                <View style={styles.decisionOptions}>
-                  <TouchableOpacity
-                    style={[styles.decisionCard, tossDecision === 'bat' && styles.decisionCardActive]}
-                    onPress={() => setTossDecision('bat')}
-                  >
-                    <Text style={styles.decisionEmoji}>🏏</Text>
-                    <Text style={[styles.decisionText, tossDecision === 'bat' && styles.decisionTextActive]}>
-                      Bat First
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.decisionCard, tossDecision === 'bowl' && styles.decisionCardActive]}
-                    onPress={() => setTossDecision('bowl')}
-                  >
-                    <Text style={styles.decisionEmoji}>⚾</Text>
-                    <Text style={[styles.decisionText, tossDecision === 'bowl' && styles.decisionTextActive]}>
-                      Bowl First
-                    </Text>
-                  </TouchableOpacity>
+                <Text style={styles.label}>Toss decision</Text>
+                <View style={styles.chipRow}>
+                  {(['bat', 'bowl'] as const).map((decision) => {
+                    const selected = tossDecision === decision;
+                    return (
+                      <TouchableOpacity
+                        key={decision}
+                        style={[styles.chip, styles.chipWide, selected && styles.chipSelected]}
+                        onPress={() => setTossDecision(decision)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                          {decision === 'bat' ? 'Bat first' : 'Bowl first'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -501,57 +528,59 @@ export default function CreateMatchScreen() {
         )}
 
         {step === 'players' && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Playing XI</Text>
+          <View>
+            <Text style={styles.stepTitle}>Select playing XI</Text>
 
-            <Text style={styles.label}>{teamAData?.name} ({playingXI_A.length + substitutes_A.length}/{totalPlayersEachSide})</Text>
-            <View style={styles.playersList}>
-              {teamAPlayers.map((player) => (
-                <TouchableOpacity
-                  key={player.id}
-                  style={[styles.playerItem, playingXI_A.includes(player.id) && styles.playerItemActive]}
-                  onPress={() => togglePlayerSelection(player.id, 'A')}
-                >
-                  <View>
-                    <Text style={styles.playerName}>{player.name}{getTeamById(teamA)?.captain === player.id && ' (C)'}</Text>
-                  </View>
-
-                  <Text style={styles.playerRole}>{player.position}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.labelRow}>
+              {teamAData && <View style={[styles.pin, { backgroundColor: teamAData.color }]} />}
+              <Text style={styles.labelInline}>{teamAData?.name}</Text>
+              <Text style={styles.count}>{playingXI_A.length + substitutes_A.length}/{totalPlayersEachSide}</Text>
+            </View>
+            <View style={styles.list}>
+              {teamAPlayers.map((player) =>
+                renderPlayerRow(
+                  player.id,
+                  `${player.name}${getTeamById(teamA)?.captain === player.id ? ' (C)' : ''}`,
+                  playingXI_A.includes(player.id),
+                  () => togglePlayerSelection(player.id, 'A'),
+                  { multi: true, meta: player.position },
+                ),
+              )}
             </View>
 
-            <Text style={styles.label}>{teamBData?.name} ({playingXI_B.length + substitutes_B.length}/{totalPlayersEachSide})</Text>
-            <View style={styles.playersList}>
-              {teamBPlayers.map((player) => (
-                <TouchableOpacity
-                  key={player.id}
-                  style={[styles.playerItem, playingXI_B.includes(player.id) && styles.playerItemActive]}
-                  onPress={() => togglePlayerSelection(player.id, 'B')}
-                >
-                  <View>
-                    <Text style={styles.playerName}>{player.name}{getTeamById(teamB)?.captain === player.id && ' (C)'}</Text>
-                  </View>
-                  <Text style={styles.playerRole}>{player.position}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.labelRow}>
+              {teamBData && <View style={[styles.pin, { backgroundColor: teamBData.color }]} />}
+              <Text style={styles.labelInline}>{teamBData?.name}</Text>
+              <Text style={styles.count}>{playingXI_B.length + substitutes_B.length}/{totalPlayersEachSide}</Text>
+            </View>
+            <View style={styles.list}>
+              {teamBPlayers.map((player) =>
+                renderPlayerRow(
+                  player.id,
+                  `${player.name}${getTeamById(teamB)?.captain === player.id ? ' (C)' : ''}`,
+                  playingXI_B.includes(player.id),
+                  () => togglePlayerSelection(player.id, 'B'),
+                  { multi: true, meta: player.position },
+                ),
+              )}
             </View>
 
             {(playingXI_A.length >= 2 && playingXI_B.length >= 2) && (
               <>
-                <Text style={styles.label}>Opening Batsmen ({openingBatsmen.length}/2)</Text>
-                <View style={styles.playersList}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.labelInline}>Opening batsmen</Text>
+                  <Text style={styles.count}>{openingBatsmen.length}/2</Text>
+                </View>
+                <View style={styles.list}>
                   {battingTeamPlayers.map((playerId) => {
                     const player = players.find(p => p.id === playerId);
                     if (!player) return null;
-                    return (
-                      <TouchableOpacity
-                        key={player.id}
-                        style={[styles.playerItem, openingBatsmen.includes(player.id) && styles.playerItemActive]}
-                        onPress={() => toggleOpeningBatsman(player.id)}
-                      >
-                        <Text style={styles.playerName}>{player.name}</Text>
-                      </TouchableOpacity>
+                    return renderPlayerRow(
+                      player.id,
+                      player.name,
+                      openingBatsmen.includes(player.id),
+                      () => toggleOpeningBatsman(player.id),
+                      { multi: true },
                     );
                   })}
                   {(() => {
@@ -561,32 +590,27 @@ export default function CreateMatchScreen() {
                       .map((sub) => {
                         const player = players.find(p => p.id === sub.playerId);
                         if (!player) return null;
-                        return (
-                          <TouchableOpacity
-                            key={`sub-${player.id}`}
-                            style={[styles.playerItem, openingBatsmen.includes(player.id) && styles.playerItemActive]}
-                            onPress={() => toggleOpeningBatsman(player.id)}
-                          >
-                            <Text style={styles.playerName}>{player.name} (Sub)</Text>
-                          </TouchableOpacity>
+                        return renderPlayerRow(
+                          `sub-${player.id}`,
+                          `${player.name} (Sub)`,
+                          openingBatsmen.includes(player.id),
+                          () => toggleOpeningBatsman(player.id),
+                          { multi: true },
                         );
                       });
                   })()}
                 </View>
 
-                <Text style={styles.label}>Opening Bowler</Text>
-                <View style={styles.playersList}>
+                <Text style={styles.label}>Opening bowler</Text>
+                <View style={styles.list}>
                   {bowlingTeamPlayers.map((playerId) => {
                     const player = players.find(p => p.id === playerId);
                     if (!player) return null;
-                    return (
-                      <TouchableOpacity
-                        key={player.id}
-                        style={[styles.playerItem, openingBowler === player.id && styles.playerItemActive]}
-                        onPress={() => setOpeningBowler(player.id)}
-                      >
-                        <Text style={styles.playerName}>{player.name}</Text>
-                      </TouchableOpacity>
+                    return renderPlayerRow(
+                      player.id,
+                      player.name,
+                      openingBowler === player.id,
+                      () => setOpeningBowler(player.id),
                     );
                   })}
                   {(() => {
@@ -596,45 +620,39 @@ export default function CreateMatchScreen() {
                       .map((sub) => {
                         const player = players.find(p => p.id === sub.playerId);
                         if (!player) return null;
-                        return (
-                          <TouchableOpacity
-                            key={`sub-${player.id}`}
-                            style={[styles.playerItem, openingBowler === player.id && styles.playerItemActive]}
-                            onPress={() => setOpeningBowler(player.id)}
-                          >
-                            <Text style={styles.playerName}>{player.name} (Sub)</Text>
-                          </TouchableOpacity>
+                        return renderPlayerRow(
+                          `sub-${player.id}`,
+                          `${player.name} (Sub)`,
+                          openingBowler === player.id,
+                          () => setOpeningBowler(player.id),
                         );
                       });
                   })()}
                 </View>
 
-                <Text style={styles.label}>Substitutes ({substitutes_A.length + substitutes_B.length})</Text>
-                <View style={styles.playersList}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.labelInline}>Substitutes</Text>
+                  <Text style={styles.count}>{substitutes_A.length + substitutes_B.length}</Text>
+                </View>
+                <View style={styles.list}>
                   {availablePlayers.map((player) => {
                     const subInA = substitutes_A.find(s => s.playerId === player.id);
                     const subInB = substitutes_B.find(s => s.playerId === player.id);
                     const sub = subInA || subInB;
                     const assignedTeam = subInA ? teamAData?.name : subInB ? teamBData?.name : null;
 
-                    return (
-                      <TouchableOpacity
-                        key={player.id}
-                        style={[styles.playerItem, sub && styles.playerItemActive]}
-                        onPress={() => sub ? removeSubstitute(player.id) : selectSubstituteWithTeamAndPermissions(player.id)}
-                      >
-                        <View>
-                          <Text style={styles.playerName}>{player.name}</Text>
-                          {sub && (
-                            <View>
-                              <Text style={styles.playerRole}>
-                                {assignedTeam} - {sub.canBat && sub.canBowl ? 'Bat & Bowl' : sub.canBat ? 'Bat Only' : 'Bowl Only'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.playerRole}>{player.position}</Text>
-                      </TouchableOpacity>
+                    return renderPlayerRow(
+                      player.id,
+                      player.name,
+                      !!sub,
+                      () => sub ? removeSubstitute(player.id) : selectSubstituteWithTeamAndPermissions(player.id),
+                      {
+                        multi: true,
+                        meta: player.position,
+                        sub: sub
+                          ? `${assignedTeam} - ${sub.canBat && sub.canBowl ? 'Bat & Bowl' : sub.canBat ? 'Bat Only' : 'Bowl Only'}`
+                          : undefined,
+                      },
                     );
                   })}
                 </View>
@@ -645,15 +663,26 @@ export default function CreateMatchScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed()}
-        >
-          <Text style={styles.nextBtnText}>
-            {step === 'players' ? 'Create Match' : 'Continue'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryBtn]}
+            onPress={handleBack}
+            accessibilityRole="button"
+          >
+            <Text style={styles.secondaryBtnText}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryBtn, !proceed && styles.disabled]}
+            onPress={handleNext}
+            disabled={!proceed}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !proceed }}
+          >
+            <Text style={styles.primaryBtnText}>
+              {step === 'players' ? 'Create Match' : 'Continue'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -665,284 +694,201 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerBtn: {
-    padding: 8,
+    padding: Space.sm,
   },
   progressContainer: {
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
+    gap: Space.sm,
+  },
+  progressText: {
+    ...Type.footnote,
+    color: Colors.textSecondary,
+  },
+  progressRule: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 40,
+    gap: Space.xs,
   },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotActive: {
-    backgroundColor: Colors.primary,
-  },
-  progressDotCompleted: {
-    backgroundColor: Colors.primary,
-  },
-  progressLine: {
-    width: 50,
-    height: 2,
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: Radius.xs,
     backgroundColor: Colors.border,
   },
-  progressLineActive: {
-    backgroundColor: Colors.primary,
+  progressSegmentDone: {
+    backgroundColor: Colors.ink,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  stepContainer: {
-    paddingTop: 10,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xxxl,
   },
   stepTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Type.title,
     color: Colors.text,
-    marginBottom: 24,
+    marginBottom: Space.sm,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 12,
-    marginTop: 16,
+    ...Type.headline,
+    color: Colors.text,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
   },
-  optionsRow: {
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginTop: Space.section - Space.sm,
+    marginBottom: Space.sm,
+  },
+  labelInline: {
+    ...Type.headline,
+    color: Colors.text,
+    flex: 1,
+  },
+  count: {
+    ...Type.number,
+    color: Colors.textSecondary,
+  },
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: Space.sm,
   },
-  optionChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
+  chip: {
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
     borderColor: Colors.border,
   },
-  optionChipWide: {
+  chipWide: {
     flex: 1,
     alignItems: 'center',
   },
-  optionChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+  chipSelected: {
+    backgroundColor: Colors.highlight,
+    borderColor: Colors.ink,
   },
-  optionText: {
-    fontSize: 14,
-    fontWeight: '600',
+  chipText: {
+    ...Type.bodyStrong,
     color: Colors.textSecondary,
   },
-  optionTextActive: {
-    color: Colors.background,
+  chipTextSelected: {
+    color: Colors.onHighlight,
   },
   input: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.text,
+    height: Touch,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
+    paddingHorizontal: Space.lg,
+    ...Type.body,
+    color: Colors.text,
   },
-  selectContainer: {
-    gap: 8,
+  list: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
+    borderColor: Colors.border,
+    overflow: 'hidden',
   },
-  selectItem: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    gap: Space.md,
+    minHeight: Touch,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+    backgroundColor: Colors.card,
+    borderBottomWidth: Hairline,
+    borderBottomColor: Colors.border,
   },
-  selectItemActive: {
-    borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}10`,
+  rowSelected: {
+    backgroundColor: Colors.highlight,
   },
-  selectText: {
-    fontSize: 14,
+  rowMain: {
+    flex: 1,
+  },
+  rowText: {
+    ...Type.bodyStrong,
+    color: Colors.text,
+    flex: 1,
+  },
+  rowTextSelected: {
+    color: Colors.onHighlight,
+  },
+  rowMeta: {
+    ...Type.footnote,
     color: Colors.textSecondary,
   },
-  selectTextActive: {
-    color: Colors.text,
-    fontWeight: '600',
+  rowMetaSelected: {
+    color: Colors.onHighlight,
   },
-  teamSelectContainer: {
-    gap: 10,
+  pin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
-  teamCard: {
-    flexDirection: 'row',
+  checkBox: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.textSecondary,
+    backgroundColor: Colors.card,
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    justifyContent: 'center',
   },
-  teamCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}10`,
+  checkBoxSelected: {
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
   },
-  teamCardDisabled: {
+  disabled: {
     opacity: 0.4,
   },
-  teamLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  teamInitials: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  teamCardName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  checkBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tossOptions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  tossCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: Colors.border,
-  },
-  tossCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}10`,
-  },
-  tossTeamLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  tossTeamInitials: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  tossTeamName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  decisionOptions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  decisionCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: Colors.border,
-  },
-  decisionCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}10`,
-  },
-  decisionEmoji: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  decisionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  decisionTextActive: {
-    color: Colors.primary,
-  },
-  playersList: {
-    gap: 8,
-  },
-  playerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  playerItemActive: {
-    borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}15`,
-  },
-  playerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  playerRole: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
   footer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    backgroundColor: Colors.background,
-    borderTopWidth: 1,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.md,
+    backgroundColor: Colors.surface,
+    borderTopWidth: Hairline,
     borderTopColor: Colors.border,
   },
-  nextBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
+  footerRow: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  button: {
+    height: Touch,
+    borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Space.lg,
   },
-  nextBtnDisabled: {
-    backgroundColor: Colors.border,
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.ink,
   },
-  nextBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.background,
+  secondaryBtnText: {
+    ...Type.headline,
+    color: Colors.text,
+  },
+  primaryBtn: {
+    flex: 2,
+    backgroundColor: Colors.primary,
+  },
+  primaryBtnText: {
+    ...Type.headline,
+    color: Colors.onPrimary,
   },
 });

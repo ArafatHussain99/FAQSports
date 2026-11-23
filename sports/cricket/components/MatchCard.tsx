@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Calendar, MapPin, Trophy } from 'lucide-react-native';
+import { Trophy } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { Hairline, Radius, Space, Type } from '@/constants/tokens';
 import { CricketMatch, CricketMatchType } from '../types';
 import { useData } from '@/context/AppContext';
 
@@ -10,99 +11,94 @@ interface Props {
   match: CricketMatch;
 }
 
+const matchTypes: { key: CricketMatchType; label: string }[] = [
+  { key: 'long', label: 'Long Pitch' },
+  { key: 'short', label: 'Short Pitch' },
+];
+
+const statusColors = {
+  upcoming: Colors.upcoming,
+  live: Colors.live,
+  completed: Colors.completed,
+  cancelled: Colors.cancelled,
+};
+
+const statusLabels = {
+  upcoming: 'UPCOMING',
+  live: 'LIVE',
+  completed: 'RESULT',
+  cancelled: 'CANCELLED',
+};
+
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 export default function MatchCard({ match }: Props) {
   const router = useRouter();
   const { getTeamById } = useData();
   const teamA = getTeamById(match.teamA);
   const teamB = getTeamById(match.teamB);
 
-  const matchTypes: { key: CricketMatchType; label: string }[] = [
-    { key: 'long', label: 'Long Pitch' },
-    { key: 'short', label: 'Short Pitch' },
-  ];
-
   if (!teamA || !teamB) return null;
 
-  const statusColors = {
-    upcoming: Colors.upcoming,
-    live: Colors.live,
-    completed: Colors.completed,
-    cancelled: Colors.cancelled,
-  };
+  const statusColor = statusColors[match.status];
+  const isCompleted = match.status === 'completed';
+  const isCancelled = match.status === 'cancelled';
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const rows = [
+    { team: teamA, innings: match.innings[0] },
+    { team: teamB, innings: match.innings[1] },
+  ];
 
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={() => router.push(`/cricket/match/${match.id}`)}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${teamA.name} versus ${teamB.name}, ${match.status}`}
     >
       <View style={styles.header}>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColors[match.status]}20` }]}>
-          <View style={[styles.statusDot, { backgroundColor: statusColors[match.status] }]} />
-          <Text style={[styles.statusText, { color: statusColors[match.status] }]}>
-            {match.status.toUpperCase()}
+        <View style={[styles.statusTag, { borderColor: statusColor }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabels[match.status]}</Text>
+        </View>
+        <Text style={styles.matchType}>
+          {matchTypes.find((eachMatch) => match.matchType === eachMatch.key)?.label}
+        </Text>
+      </View>
+
+      {rows.map(({ team, innings }) => (
+        <View key={team.id} style={styles.teamRow}>
+          <View style={[styles.pin, { backgroundColor: team.color }]} />
+          <Text style={[styles.teamName, isCancelled && styles.struck]} numberOfLines={1}>
+            {team.name}
           </Text>
-        </View>
-        <Text style={styles.matchType}>{matchTypes.find((eachMatch) => match.matchType === eachMatch.key)?.label}</Text>
-      </View>
-
-      <View style={styles.teamsContainer}>
-        <View style={styles.team}>
-          <View style={[styles.teamLogo, { backgroundColor: teamA.color }]}>
-            <Text style={styles.teamInitial}>{teamA.shortName}</Text>
-          </View>
-          <Text style={styles.teamName} numberOfLines={1}>{teamA.name}</Text>
-          {match.status === 'completed' && match.innings[0] && (
+          {isCompleted && innings && (
             <Text style={styles.teamScore}>
-              {match.innings[0].runs}/{match.innings[0].wickets}
+              {innings.runs}/{innings.wickets}
             </Text>
           )}
         </View>
+      ))}
 
-        <View style={styles.vsContainer}>
-          <Text style={styles.vsText}>VS</Text>
-        </View>
-
-        <View style={styles.team}>
-          <View style={[styles.teamLogo, { backgroundColor: teamB.color }]}>
-            <Text style={styles.teamInitial}>{teamB.shortName}</Text>
-          </View>
-          <Text style={styles.teamName} numberOfLines={1}>{teamB.name}</Text>
-          {match.status === 'completed' && match.innings[1] && (
-            <Text style={styles.teamScore}>
-              {match.innings[1].runs}/{match.innings[1].wickets}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {match.status === 'completed' && match.result && (
-        <View style={styles.resultContainer}>
-          <Trophy size={14} color={Colors.primary} />
+      {isCompleted && match.result && (
+        <View style={styles.resultRow}>
+          <Trophy size={14} color={Colors.completed} />
           <Text style={styles.resultText}>{match.result}</Text>
         </View>
       )}
 
-      <View style={styles.footer}>
-        <View style={styles.footerItem}>
-          <Calendar size={14} color={Colors.textMuted} />
-          <Text style={styles.footerText}>{formatDate(match.createdAt)}</Text>
-        </View>
-        <View style={styles.footerItem}>
-          <MapPin size={14} color={Colors.textMuted} />
-          <Text style={styles.footerText}>{match.ground}</Text>
-        </View>
-      </View>
+      <Text style={styles.footerText} numberOfLines={1}>
+        {formatDate(match.createdAt)} · {match.ground}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -110,113 +106,74 @@ export default function MatchCard({ match }: Props) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
+    borderRadius: Radius.md,
+    borderWidth: Hairline,
     borderColor: Colors.border,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    marginBottom: Space.md,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Space.xs,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  statusTag: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.xs + 2,
+    paddingVertical: 1,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    ...Type.tag,
   },
   matchType: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
+    ...Type.footnote,
+    color: Colors.textSecondary,
   },
-  teamsContainer: {
+  teamRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Space.sm,
+    minHeight: 36,
   },
-  team: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  teamLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  teamInitial: {
-    color: Colors.text,
-    fontSize: 14,
-    fontWeight: '700',
+  pin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   teamName: {
+    ...Type.bodyStrong,
     color: Colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
+    flex: 1,
+  },
+  struck: {
+    textDecorationLine: 'line-through',
+    color: Colors.textSecondary,
   },
   teamScore: {
-    color: Colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
+    ...Type.scoreM,
+    color: Colors.text,
   },
-  vsContainer: {
-    width: 40,
-    alignItems: 'center',
-  },
-  vsText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  resultContainer: {
+  resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    gap: Space.xs + 2,
+    marginTop: Space.xs,
   },
   resultText: {
-    color: Colors.primary,
-    fontSize: 12,
+    ...Type.subhead,
     fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  footerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    color: Colors.completed,
+    flex: 1,
   },
   footerText: {
-    color: Colors.textMuted,
-    fontSize: 11,
+    ...Type.footnote,
+    color: Colors.textSecondary,
+    borderTopWidth: Hairline,
+    borderTopColor: Colors.border,
+    marginTop: Space.sm,
+    paddingTop: Space.sm,
   },
 });
